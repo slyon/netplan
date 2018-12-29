@@ -51,7 +51,7 @@ reload_udevd(void)
 };
 
 static void
-nd_iterator(gpointer key, gpointer value, gpointer user_data)
+nd_iterator_list(gpointer value, gpointer user_data)
 {
     if (write_networkd_conf((net_definition*) value, (const char*) user_data))
         any_networkd = TRUE;
@@ -250,15 +250,15 @@ int main(int argc, char** argv)
     /* Generate backend specific configuration files from merged data. */
     if (netdefs) {
         g_debug("Generating output files..");
-        g_hash_table_foreach(netdefs, nd_iterator, rootdir);
+        g_list_foreach (netdefs_ordered, nd_iterator_list, rootdir);
         write_nm_conf_finish(rootdir);
-	/* We may have written .rules & .link files, thus we must
-	 * invalidate udevd cache of its config as by default it only
-	 * invalidates cache at most every 3 seconds. Not sure if this
-	 * should live in `generate' or `apply', but it is confusing
-	 * when udevd ignores just-in-time created rules files.
-	 */
-	reload_udevd();
+        /* We may have written .rules & .link files, thus we must
+         * invalidate udevd cache of its config as by default it only
+         * invalidates cache at most every 3 seconds. Not sure if this
+         * should live in `generate' or `apply', but it is confusing
+         * when udevd ignores just-in-time created rules files.
+         */
+        reload_udevd();
     }
 
     /* Disable /usr/lib/NetworkManager/conf.d/10-globally-managed-devices.conf

@@ -34,6 +34,7 @@ typedef enum {
     ND_BRIDGE = ND_VIRTUAL,
     ND_BOND,
     ND_VLAN,
+    ND_TUNNEL,
 } netdef_type;
 
 typedef enum {
@@ -63,6 +64,46 @@ typedef enum {
     OPTIONAL_STATIC  = 1<<4,
 } optional_addr;
 
+/* Tunnel mode enum; sync with NetworkManager's DBUS API */
+/* TODO: figure out whether networkd's GRETAP and NM's ISATAP
+ *       are the same thing.
+ */
+typedef enum {
+    TUNNEL_MODE_UNKNOWN     = 0,
+    TUNNEL_MODE_IPIP        = 1,
+    TUNNEL_MODE_GRE         = 2,
+    TUNNEL_MODE_SIT         = 3,
+    TUNNEL_MODE_ISATAP      = 4,  // NM only.
+    TUNNEL_MODE_VTI         = 5,
+    TUNNEL_MODE_IP6IP6      = 6,
+    TUNNEL_MODE_IPIP6       = 7,
+    TUNNEL_MODE_IP6GRE      = 8,
+    TUNNEL_MODE_VTI6        = 9,
+
+    /* systemd-only, apparently? */
+    TUNNEL_MODE_GRETAP      = 101,
+    TUNNEL_MODE_IP6GRETAP   = 102,
+
+    _TUNNEL_MODE_MAX,
+} tunnel_mode;
+
+static const char* const
+tunnel_mode_table[_TUNNEL_MODE_MAX] = {
+    [TUNNEL_MODE_UNKNOWN] = "unknown",
+    [TUNNEL_MODE_IPIP] = "ipip",
+    [TUNNEL_MODE_GRE] = "gre",
+    [TUNNEL_MODE_SIT] = "sit",
+    [TUNNEL_MODE_ISATAP] = "isatap",
+    [TUNNEL_MODE_VTI] = "vti",
+    [TUNNEL_MODE_IP6IP6] = "ip6ip6",
+    [TUNNEL_MODE_IPIP6] = "ipip6",
+    [TUNNEL_MODE_IP6GRE] = "ip6gre",
+    [TUNNEL_MODE_VTI6] = "vti6",
+
+    [TUNNEL_MODE_GRETAP] = "gretap",
+    [TUNNEL_MODE_IP6GRETAP] = "ip6gretap",
+};
+
 struct optional_address_option {
     char* name;
     optional_addr flag;
@@ -70,10 +111,48 @@ struct optional_address_option {
 
 extern struct optional_address_option optional_address_options[];
 
+typedef enum {
+    KEY_MANAGEMENT_NONE,
+    KEY_MANAGEMENT_WPA_PSK,
+    KEY_MANAGEMENT_WPA_EAP,
+    KEY_MANAGEMENT_8021X,
+} auth_key_management_type;
+
+typedef enum {
+    EAP_NONE,
+    EAP_TLS,
+    EAP_PEAP,
+    EAP_TTLS,
+} auth_eap_method;
+
 typedef struct missing_node {
     char* netdef_id;
     const yaml_node_t* node;
 } missing_node;
+
+typedef struct authentication_settings {
+    auth_key_management_type key_management;
+    auth_eap_method eap_method;
+    char* identity;
+    char* anonymous_identity;
+    char* password;
+    char* ca_certificate;
+    char* client_certificate;
+    char* client_key;
+    char* client_key_password;
+} authentication_settings;
+
+/* Fields below are valid for dhcp4 and dhcp6 unless otherwise noted. */
+typedef struct dhcp_overrides {
+    gboolean use_dns;
+    gboolean use_ntp;
+    gboolean send_hostname;
+    gboolean use_hostname;
+    gboolean use_mtu;
+    gboolean use_routes;
+    char* hostname;
+    guint metric;
+} dhcp_overrides;
 
 /**
  * Represent a configuration stanza
@@ -94,9 +173,12 @@ typedef struct net_definition {
     gboolean dhcp4;
     gboolean dhcp6;
     char* dhcp_identifier;
+    dhcp_overrides dhcp4_overrides;
+    dhcp_overrides dhcp6_overrides;
     ra_mode accept_ra;
     GArray* ip4_addresses;
     GArray* ip6_addresses;
+    gboolean ip6_privacy;
     char* gateway4;
     char* gateway6;
     GArray* ip4_nameservers;
@@ -173,6 +255,16 @@ typedef struct net_definition {
     } bridge_params;
     gboolean custom_bridging;
 
+    struct {
+        tunnel_mode mode;
+        char *local_ip;
+        char *remote_ip;
+        char *input_key;
+        char *output_key;
+    } tunnel;
+
+    authentication_settings auth;
+    gboolean has_auth;
 } net_definition;
 
 typedef enum {
@@ -184,7 +276,9 @@ typedef enum {
 typedef struct {
     wifi_mode mode;
     char* ssid;
-    char* password;
+
+    authentication_settings auth;
+    gboolean has_auth;
 } wifi_access_point;
 
 #define METRIC_UNSPEC G_MAXUINT
@@ -227,6 +321,7 @@ typedef struct {
 
 /* Written/updated by parse_yaml(): char* id →  net_definition */
 extern GHashTable* netdefs;
+extern GList* netdefs_ordered;
 
 /****************************************************
  * Functions
@@ -235,3 +330,4 @@ extern GHashTable* netdefs;
 gboolean parse_yaml(const char* filename, GError** error);
 gboolean finish_parse(GError** error);
 netdef_backend get_global_backend();
+const char* tunnel_mode_to_string(tunnel_mode mode);

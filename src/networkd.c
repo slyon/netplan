@@ -54,6 +54,24 @@ append_match_section(net_definition* def, GString* s, gboolean match_rename)
         else if (def->match.original_name)
             g_string_append_printf(s, "Name=%s\n", def->match.original_name);
     }
+
+    /* Workaround for bug LP: #1804861: something outputs netplan config
+     * that includes using the MAC of the first phy member of a bond as
+     * default value for the MAC of the bond device itself. This is
+     * evil, it's an optional field and networkd knows what to do if
+     * the MAC isn't specified; but work around this by adding an
+     * arbitrary additional match condition on Path= for the phys.
+     * This way, hopefully setting a MTU on the phy does not bleed over
+     * to bond/bridge and any further virtual devices (VLANs?) on top of
+     * it.
+     * Make sure to add the extra match only if we're matching by MAC
+     * already and dealing with a bond or bridge.
+     */
+    if (def->bond || def->bridge) {
+        /* update if we support new device types */
+        if (def->match.mac)
+            g_string_append(s, "Type=!vlan bond bridge\n");
+    }
 }
 
 static void
@@ -80,6 +98,27 @@ write_bridge_params(GString* s, net_definition* def)
 
         g_string_free(params, TRUE);
     }
+}
+
+static void
+write_tunnel_params(GString* s, net_definition* def)
+{
+    GString *params = NULL;
+
+    params = g_string_sized_new(200);
+
+    g_string_printf(params, "Independent=true\n");
+    if (def->tunnel.mode == TUNNEL_MODE_IPIP6 || def->tunnel.mode == TUNNEL_MODE_IP6IP6)
+        g_string_append_printf(params, "Mode=%s\n", tunnel_mode_to_string(def->tunnel.mode));
+    g_string_append_printf(params, "Local=%s\n", def->tunnel.local_ip);
+    g_string_append_printf(params, "Remote=%s\n", def->tunnel.remote_ip);
+    if (def->tunnel.input_key)
+        g_string_append_printf(params, "InputKey=%s\n", def->tunnel.input_key);
+    if (def->tunnel.output_key)
+        g_string_append_printf(params, "OutputKey=%s\n", def->tunnel.output_key);
+
+    g_string_append_printf(s, "\n[Tunnel]\n%s", params->str);
+    g_string_free(params, TRUE);
 }
 
 static void
@@ -240,6 +279,35 @@ write_netdev_file(net_definition* def, const char* rootdir, const char* path)
             g_string_append_printf(s, "Kind=vlan\n\n[VLAN]\nId=%u\n", def->vlan_id);
             break;
 
+        case ND_TUNNEL:
+            switch(def->tunnel.mode) {
+                case TUNNEL_MODE_GRE:
+                case TUNNEL_MODE_GRETAP:
+                case TUNNEL_MODE_IPIP:
+                case TUNNEL_MODE_IP6GRE:
+                case TUNNEL_MODE_IP6GRETAP:
+                case TUNNEL_MODE_SIT:
+                case TUNNEL_MODE_VTI:
+                case TUNNEL_MODE_VTI6:
+                    g_string_append_printf(s,
+                                          "Kind=%s\n",
+                                          tunnel_mode_to_string(def->tunnel.mode));
+                    break;
+
+                case TUNNEL_MODE_IP6IP6:
+                case TUNNEL_MODE_IPIP6:
+                    g_string_append(s, "Kind=ip6tnl\n");
+                    break;
+
+                // LCOV_EXCL_START
+                default:
+                    g_assert_not_reached();
+                // LCOV_EXCL_STOP
+            }
+
+            write_tunnel_params(s, def);
+            break;
+
         // LCOV_EXCL_START
         default:
             g_assert_not_reached();
@@ -297,6 +365,55 @@ write_ip_rule(ip_rule* r, GString* s)
         g_string_append_printf(s, "TypeOfService=%d\n", r->tos);
 }
 
+#define DHCP_OVERRIDES_ERROR                                            \
+    "ERROR: %s: networkd requires that %s has the same value in both "  \
+    "dhcp4_overrides and dhcp6_overrides\n"
+
+static void
+combine_dhcp_overrides(net_definition* def, dhcp_overrides* combined_dhcp_overrides)
+{
+    /* if only one of dhcp4 or dhcp6 is enabled, those overrides are used */
+    if (def->dhcp4 && !def->dhcp6) {
+        *combined_dhcp_overrides = def->dhcp4_overrides;
+    } else if (!def->dhcp4 && def->dhcp6) {
+        *combined_dhcp_overrides = def->dhcp6_overrides;
+    } else {
+        /* networkd doesn't support separately configuring dhcp4 and dhcp6, so
+         * we enforce that they are the same.
+         */
+        if (def->dhcp4_overrides.use_dns != def->dhcp6_overrides.use_dns) {
+            g_fprintf(stderr, DHCP_OVERRIDES_ERROR, def->id, "use-dns");
+            exit(1);
+        }
+        if (def->dhcp4_overrides.use_ntp != def->dhcp6_overrides.use_ntp) {
+            g_fprintf(stderr, DHCP_OVERRIDES_ERROR, def->id, "use-ntp");
+            exit(1);
+        }
+        if (def->dhcp4_overrides.send_hostname != def->dhcp6_overrides.send_hostname) {
+            g_fprintf(stderr, DHCP_OVERRIDES_ERROR, def->id, "send-hostname");
+            exit(1);
+        }
+        if (def->dhcp4_overrides.use_hostname != def->dhcp6_overrides.use_hostname) {
+            g_fprintf(stderr, DHCP_OVERRIDES_ERROR, def->id, "use-hostname");
+            exit(1);
+        }
+        if (def->dhcp4_overrides.use_mtu != def->dhcp6_overrides.use_mtu) {
+            g_fprintf(stderr, DHCP_OVERRIDES_ERROR, def->id, "use-mtu");
+            exit(1);
+        }
+        if (g_strcmp0(def->dhcp4_overrides.hostname, def->dhcp6_overrides.hostname) != 0) {
+            g_fprintf(stderr, DHCP_OVERRIDES_ERROR, def->id, "hostname");
+            exit(1);
+        }
+        if (def->dhcp4_overrides.metric != def->dhcp6_overrides.metric) {
+            g_fprintf(stderr, DHCP_OVERRIDES_ERROR, def->id, "route-metric");
+            exit(1);
+        }
+        /* Just use dhcp4_overrides now, since we know they are the same. */
+        *combined_dhcp_overrides = def->dhcp4_overrides;
+    }
+}
+
 static void
 write_network_file(net_definition* def, const char* rootdir, const char* path)
 {
@@ -316,14 +433,14 @@ write_network_file(net_definition* def, const char* rootdir, const char* path)
 
     if (def->optional || def->optional_addresses) {
         g_string_append(s, "\n[Link]\n");
-	if (def->optional) {
-	    g_string_append(s, "RequiredForOnline=no\n");
-	}
-	for (unsigned i = 0; optional_address_options[i].name != NULL; ++i) {
-	    if (def->optional_addresses & optional_address_options[i].flag) {
-		g_string_append_printf(s, "OptionalAddresses=%s\n", optional_address_options[i].name);
-	    }
-	}
+        if (def->optional) {
+            g_string_append(s, "RequiredForOnline=no\n");
+        }
+        for (unsigned i = 0; optional_address_options[i].name != NULL; ++i) {
+            if (def->optional_addresses & optional_address_options[i].flag) {
+            g_string_append_printf(s, "OptionalAddresses=%s\n", optional_address_options[i].name);
+            }
+        }
     }
 
     g_string_append(s, "\n[Network]\n");
@@ -358,6 +475,8 @@ write_network_file(net_definition* def, const char* rootdir, const char* path)
         g_string_append_printf(s, "IPv6AcceptRA=yes\n");
     else if (def->accept_ra == ACCEPT_RA_DISABLED)
         g_string_append_printf(s, "IPv6AcceptRA=no\n");
+    if (def->ip6_privacy)
+        g_string_append(s, "IPv6PrivacyExtensions=yes\n");
     if (def->gateway4)
         g_string_append_printf(s, "Gateway=%s\n", def->gateway4);
     if (def->gateway6)
@@ -419,15 +538,45 @@ write_network_file(net_definition* def, const char* rootdir, const char* path)
     }
 
     if (def->dhcp4 || def->dhcp6) {
-        /* isc-dhcp dhclient compatible UseMTU, networkd default is to
-         * not accept MTU, which breaks clouds */
-        g_string_append_printf(s, "\n[DHCP]\nUseMTU=true\n");
         /* NetworkManager compatible route metrics */
-        g_string_append_printf(s, "RouteMetric=%i\n", (def->type == ND_WIFI ? 600 : 100));
+        g_string_append(s, "\n[DHCP]\n");
         if (g_strcmp0(def->dhcp_identifier, "duid") != 0)
             g_string_append_printf(s, "ClientIdentifier=%s\n", def->dhcp_identifier);
         if (def->critical)
             g_string_append_printf(s, "CriticalConnection=true\n");
+
+        dhcp_overrides combined_dhcp_overrides;
+        combine_dhcp_overrides(def, &combined_dhcp_overrides);
+
+        if (combined_dhcp_overrides.metric == METRIC_UNSPEC) {
+            g_string_append_printf(s, "RouteMetric=%i\n", (def->type == ND_WIFI ? 600 : 100));
+        } else {
+            g_string_append_printf(s, "RouteMetric=%u\n",
+                                   combined_dhcp_overrides.metric);
+        }
+
+        /* Only set MTU from DHCP if use-mtu dhcp-override is not false. */
+        if (!combined_dhcp_overrides.use_mtu) {
+            /* isc-dhcp dhclient compatible UseMTU, networkd default is to
+             * not accept MTU, which breaks clouds */
+            g_string_append_printf(s, "UseMTU=false\n");
+        } else {
+            g_string_append_printf(s, "UseMTU=true\n");
+        }
+
+        /* Only write DHCP options that differ from the networkd default. */
+        if (!combined_dhcp_overrides.use_routes)
+            g_string_append_printf(s, "UseRoutes=false\n");
+        if (!combined_dhcp_overrides.use_dns)
+            g_string_append_printf(s, "UseDNS=false\n");
+        if (!combined_dhcp_overrides.use_ntp)
+            g_string_append_printf(s, "UseNTP=false\n");
+        if (!combined_dhcp_overrides.send_hostname)
+            g_string_append_printf(s, "SendHostname=false\n");
+        if (!combined_dhcp_overrides.use_hostname)
+            g_string_append_printf(s, "UseHostname=false\n");
+        if (combined_dhcp_overrides.hostname)
+            g_string_append_printf(s, "Hostname=%s\n", combined_dhcp_overrides.hostname);
     }
 
     /* these do not contain secrets and need to be readable by
@@ -482,33 +631,110 @@ write_rules_file(net_definition* def, const char* rootdir)
 }
 
 static void
+append_wpa_auth_conf(GString* s, const authentication_settings* auth)
+{
+    switch (auth->key_management) {
+        case KEY_MANAGEMENT_NONE:
+            g_string_append(s, "  key_mgmt=NONE\n");
+            break;
+
+        case KEY_MANAGEMENT_WPA_PSK:
+            g_string_append(s, "  key_mgmt=WPA-PSK\n");
+            break;
+
+        case KEY_MANAGEMENT_WPA_EAP:
+            g_string_append(s, "  key_mgmt=WPA-EAP\n");
+            break;
+
+        case KEY_MANAGEMENT_8021X:
+            g_string_append(s, "  key_mgmt=IEEE8021X\n");
+            break;
+    }
+
+    switch (auth->eap_method) {
+        case EAP_NONE:
+            break;
+
+        case EAP_TLS:
+            g_string_append(s, "  eap=TLS\n");
+            break;
+
+        case EAP_PEAP:
+            g_string_append(s, "  eap=PEAP\n");
+            break;
+
+        case EAP_TTLS:
+            g_string_append(s, "  eap=TTLS\n");
+            break;
+    }
+
+    if (auth->identity) {
+        g_string_append_printf(s, "  identity=\"%s\"\n", auth->identity);
+    }
+    if (auth->anonymous_identity) {
+        g_string_append_printf(s, "  anonymous_identity=\"%s\"\n", auth->anonymous_identity);
+    }
+    if (auth->password) {
+        if (auth->key_management == KEY_MANAGEMENT_WPA_PSK) {
+            g_string_append_printf(s, "  psk=\"%s\"\n", auth->password);
+        } else {
+            g_string_append_printf(s, "  password=\"%s\"\n", auth->password);
+        }
+    }
+    if (auth->ca_certificate) {
+        g_string_append_printf(s, "  ca_cert=\"%s\"\n", auth->ca_certificate);
+    }
+    if (auth->client_certificate) {
+        g_string_append_printf(s, "  client_cert=\"%s\"\n", auth->client_certificate);
+    }
+    if (auth->client_key) {
+        g_string_append_printf(s, "  private_key=\"%s\"\n", auth->client_key);
+    }
+    if (auth->client_key_password) {
+        g_string_append_printf(s, "  private_key_passwd=\"%s\"\n", auth->client_key_password);
+    }
+}
+
+static void
 write_wpa_conf(net_definition* def, const char* rootdir)
 {
     GHashTableIter iter;
-    wifi_access_point* ap;
     GString* s = g_string_new("ctrl_interface=/run/wpa_supplicant\n\n");
     g_autofree char* path = g_strjoin(NULL, "run/netplan/wpa-", def->id, ".conf", NULL);
     mode_t orig_umask;
 
     g_debug("%s: Creating wpa_supplicant configuration file %s", def->id, path);
-    g_hash_table_iter_init(&iter, def->access_points);
-    while (g_hash_table_iter_next(&iter, NULL, (gpointer) &ap)) {
-        g_string_append_printf(s, "network={\n  ssid=\"%s\"\n", ap->ssid);
-        if (ap->password)
-            g_string_append_printf(s, "  psk=\"%s\"\n", ap->password);
-        else
-            g_string_append(s, "  key_mgmt=NONE\n");
-        switch (ap->mode) {
-            case WIFI_MODE_INFRASTRUCTURE:
-                /* default in wpasupplicant */
-                break;
-            case WIFI_MODE_ADHOC:
-                g_string_append(s, "  mode=1\n");
-                break;
-            case WIFI_MODE_AP:
-                g_fprintf(stderr, "ERROR: %s: networkd does not support wifi in access point mode\n", def->id);
-                exit(1);
+    if (def->type == ND_WIFI) {
+        wifi_access_point* ap;
+        g_hash_table_iter_init(&iter, def->access_points);
+        while (g_hash_table_iter_next(&iter, NULL, (gpointer) &ap)) {
+            g_string_append_printf(s, "network={\n  ssid=\"%s\"\n", ap->ssid);
+            switch (ap->mode) {
+                case WIFI_MODE_INFRASTRUCTURE:
+                    /* default in wpasupplicant */
+                    break;
+                case WIFI_MODE_ADHOC:
+                    g_string_append(s, "  mode=1\n");
+                    break;
+                case WIFI_MODE_AP:
+                    g_fprintf(stderr, "ERROR: %s: networkd does not support wifi in access point mode\n", def->id);
+                    exit(1);
+            }
+
+            /* wifi auth trumps netdef auth */
+            if (ap->has_auth) {
+                append_wpa_auth_conf(s, &ap->auth);
+            }
+            else {
+                g_string_append(s, "  key_mgmt=NONE\n");
+            }
+            g_string_append(s, "}\n");
         }
+    }
+    else {
+        /* wired 802.1x auth or similar */
+        g_string_append(s, "network={\n");
+        append_wpa_auth_conf(s, &def->auth);
         g_string_append(s, "}\n");
     }
 
@@ -540,9 +766,9 @@ write_networkd_conf(net_definition* def, const char* rootdir)
         return FALSE;
     }
 
-    if (def->type == ND_WIFI) {
+    if (def->type == ND_WIFI || def->has_auth) {
         g_autofree char* link = g_strjoin(NULL, rootdir ?: "", "/run/systemd/system/multi-user.target.wants/netplan-wpa@", def->id, ".service", NULL);
-        if (def->has_match) {
+        if (def->type == ND_WIFI && def->has_match) {
             g_fprintf(stderr, "ERROR: %s: networkd backend does not support wifi with match:, only by interface name\n", def->id);
             exit(1);
         }

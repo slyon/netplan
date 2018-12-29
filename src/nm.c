@@ -86,6 +86,8 @@ type_str(netdef_type type)
             return "bond";
         case ND_VLAN:
             return "vlan";
+        case ND_TUNNEL:
+            return "ip-tunnel";
         // LCOV_EXCL_START
         default:
             g_assert_not_reached();
@@ -213,7 +215,7 @@ write_bond_parameters(const net_definition* def, GString *s)
     if (def->bond_params.gratuitous_arp) {
         g_string_append_printf(params, "\nnum_grat_arp=%d", def->bond_params.gratuitous_arp);
         /* Work around issue in NM where unset unsolicited_na will overwrite num_grat_arp:
-	 * https://github.com/NetworkManager/NetworkManager/commit/42b0bef33c77a0921590b2697f077e8ea7805166 */
+         * https://github.com/NetworkManager/NetworkManager/commit/42b0bef33c77a0921590b2697f077e8ea7805166 */
         g_string_append_printf(params, "\nnum_unsol_na=%d", def->bond_params.gratuitous_arp);
     }
     if (def->bond_params.packets_per_slave)
@@ -257,6 +259,94 @@ write_bridge_params(const net_definition* def, GString *s)
 
         g_string_free(params, TRUE);
     }
+}
+
+static void
+write_tunnel_params(const net_definition* def, GString *s)
+{
+    g_string_append(s, "\n[ip-tunnel]\n");
+
+    g_string_append_printf(s, "mode=%d\n", def->tunnel.mode);
+    g_string_append_printf(s, "local=%s\n", def->tunnel.local_ip);
+    g_string_append_printf(s, "remote=%s\n", def->tunnel.remote_ip);
+
+    if (def->tunnel.input_key)
+        g_string_append_printf(s, "input-key=%s\n", def->tunnel.input_key);
+    if (def->tunnel.output_key)
+        g_string_append_printf(s, "output-key=%s\n", def->tunnel.output_key);
+}
+
+static void
+write_dot1x_auth_parameters(const authentication_settings* auth, GString *s)
+{
+    if (auth->eap_method == EAP_NONE) {
+        return;
+    }
+
+    g_string_append_printf(s, "\n[802-1x]\n");
+
+    switch (auth->eap_method) {
+        case EAP_NONE: break; // LCOV_EXCL_LINE
+        case EAP_TLS:
+            g_string_append(s, "eap=tls\n");
+            break;
+        case EAP_PEAP:
+            g_string_append(s, "eap=peap\n");
+            break;
+        case EAP_TTLS:
+            g_string_append(s, "eap=ttls\n");
+            break;
+    }
+
+    if (auth->identity) {
+        g_string_append_printf(s, "identity=%s\n", auth->identity);
+    }
+    if (auth->anonymous_identity) {
+        g_string_append_printf(s, "anonymous-identity=%s\n", auth->anonymous_identity);
+    }
+    if (auth->password && auth->key_management != KEY_MANAGEMENT_WPA_PSK) {
+        g_string_append_printf(s, "password=%s\n", auth->password);
+    }
+    if (auth->ca_certificate) {
+        g_string_append_printf(s, "ca-cert=%s\n", auth->ca_certificate);
+    }
+    if (auth->client_certificate) {
+        g_string_append_printf(s, "client-cert=%s\n", auth->client_certificate);
+    }
+    if (auth->client_key) {
+        g_string_append_printf(s, "private-key=%s\n", auth->client_key);
+    }
+    if (auth->client_key_password) {
+        g_string_append_printf(s, "private-key-password=%s\n", auth->client_key_password);
+    }
+}
+
+static void
+write_wifi_auth_parameters(const authentication_settings* auth, GString *s)
+{
+    if (auth->key_management == KEY_MANAGEMENT_NONE) {
+        return;
+    }
+
+    g_string_append(s, "\n[wifi-security]\n");
+
+    switch (auth->key_management) {
+        case KEY_MANAGEMENT_NONE: break; // LCOV_EXCL_LINE
+        case KEY_MANAGEMENT_WPA_PSK:
+            g_string_append(s, "key-mgmt=wpa-psk\n");
+            if (auth->password) {
+                g_string_append_printf(s, "psk=%s\n", auth->password);
+            }
+            break;
+        case KEY_MANAGEMENT_WPA_EAP:
+            g_string_append(s, "key-mgmt=wpa-eap\n");
+            break;
+        case KEY_MANAGEMENT_8021X:
+            g_string_append(s, "key-mgmt=ieee8021x\n");
+            break;
+    }
+
+    write_dot1x_auth_parameters(auth, s);
 }
 
 static void
@@ -406,6 +496,9 @@ write_nm_conf_access_point(net_definition* def, const char* rootdir, const wifi_
     if (def->type == ND_BOND)
         write_bond_parameters(def, s);
 
+    if (def->type == ND_TUNNEL)
+        write_tunnel_params(def, s);
+
     g_string_append(s, "\n[ipv4]\n");
 
     if (ap && ap->mode == WIFI_MODE_AP)
@@ -415,6 +508,9 @@ write_nm_conf_access_point(net_definition* def, const char* rootdir, const wifi_
     else if (def->ip4_addresses)
         /* This requires adding at least one address (done below) */
         g_string_append(s, "method=manual\n");
+    else if (def->type == ND_TUNNEL)
+        /* sit tunnels will not start in link-local apparently */
+        g_string_append(s, "method=disabled\n");
     else
         /* Without any address, this is the only available mode */
         g_string_append(s, "method=link-local\n");
@@ -437,12 +533,22 @@ write_nm_conf_access_point(net_definition* def, const char* rootdir, const wifi_
         write_routes(def, s, AF_INET);
     }
 
+    if (!def->dhcp4_overrides.use_routes) {
+        g_string_append(s, "ignore-auto-routes=true\n");
+        g_string_append(s, "never-default=true\n");
+    }
+
+    if (def->dhcp4 && def->dhcp4_overrides.metric != METRIC_UNSPEC)
+        g_string_append_printf(s, "route-metric=%u\n", def->dhcp4_overrides.metric);
+
     if (def->dhcp6 || def->ip6_addresses || def->gateway6 || def->ip6_nameservers) {
         g_string_append(s, "\n[ipv6]\n");
         g_string_append(s, def->dhcp6 ? "method=auto\n" : "method=manual\n");
         if (def->ip6_addresses)
             for (unsigned i = 0; i < def->ip6_addresses->len; ++i)
                 g_string_append_printf(s, "address%i=%s\n", i+1, g_array_index(def->ip6_addresses, char*, i));
+        if (def->ip6_privacy)
+            g_string_append(s, "ip6-privacy=2\n");
         if (def->gateway6)
             g_string_append_printf(s, "gateway=%s\n", def->gateway6);
         if (def->ip6_nameservers) {
@@ -457,6 +563,14 @@ write_nm_conf_access_point(net_definition* def, const char* rootdir, const wifi_
 
         /* We can only write valid routes if there is a DHCPv6 or static IPv6 address */
         write_routes(def, s, AF_INET6);
+
+        if (!def->dhcp6_overrides.use_routes) {
+            g_string_append(s, "ignore-auto-routes=true\n");
+            g_string_append(s, "never-default=true\n");
+        }
+
+        if (def->dhcp6_overrides.metric != METRIC_UNSPEC)
+            g_string_append_printf(s, "route-metric=%u\n", def->dhcp6_overrides.metric);
     }
     else {
         g_string_append(s, "\n[ipv6]\nmethod=ignore\n");
@@ -469,10 +583,14 @@ write_nm_conf_access_point(net_definition* def, const char* rootdir, const wifi_
         conf_path = g_strjoin(NULL, "run/NetworkManager/system-connections/netplan-", def->id, "-", escaped_ssid, NULL);
 
         g_string_append_printf(s, "\n[wifi]\nssid=%s\nmode=%s\n", ap->ssid, wifi_mode_str(ap->mode));
-        if (ap->password)
-            g_string_append_printf(s, "\n[wifi-security]\nkey-mgmt=wpa-psk\npsk=%s\n", ap->password);
+        if (ap->has_auth) {
+            write_wifi_auth_parameters(&ap->auth, s);
+        }
     } else {
         conf_path = g_strjoin(NULL, "run/NetworkManager/system-connections/netplan-", def->id, NULL);
+        if (def->has_auth) {
+            write_dot1x_auth_parameters(&def->auth, s);
+        }
     }
 
     /* NM connection files might contain secrets, and NM insists on tight permissions */
