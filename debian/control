@@ -4,7 +4,7 @@ Uploaders:
  Andrej Shadura <andrewsh@debian.org>,
  Mathieu Trudel-Lapierre <mathieu.trudel-lapierre@canonical.com>
 Section: net
-Priority: important
+Priority: optional
 Standards-Version: 4.1.3
 Build-Depends: debhelper (>= 11),
  pkg-config,
