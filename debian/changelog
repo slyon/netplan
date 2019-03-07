@@ -1,4 +1,4 @@
-netplan.io (0.96-0ubuntu1) UNRELEASED; urgency=medium
+netplan.io (0.96-0ubuntu1) disco; urgency=medium
 
   * New upstream release 0.96.
     - Moved netplan-wpa@ services to earlier at boot (LP: #1819014)
@@ -11,7 +11,7 @@ netplan.io (0.96-0ubuntu1) UNRELEASED; urgency=medium
     - Fix typos in documentation.
   * debian/control: Update Maintainer for ubuntu upload.
 
- -- Mathieu Trudel-Lapierre <cyphermox@ubuntu.com>  Thu, 07 Mar 2019 09:53:01 -0500
+ -- Mathieu Trudel-Lapierre <cyphermox@ubuntu.com>  Thu, 07 Mar 2019 14:00:26 -0500
 
 netplan.io (0.95-2) unstable; urgency=medium
 
