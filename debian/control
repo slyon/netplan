@@ -1,5 +1,6 @@
 Source: netplan.io
-Maintainer: Debian netplan Maintainers <team+netplan@tracker.debian.org>
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+XSBC-Original-Maintainer: Debian netplan Maintainers <team+netplan@tracker.debian.org>
 Uploaders:
  Andrej Shadura <andrewsh@debian.org>,
  Mathieu Trudel-Lapierre <mathieu.trudel-lapierre@canonical.com>

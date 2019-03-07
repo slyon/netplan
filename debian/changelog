@@ -9,6 +9,7 @@ netplan.io (0.96-0ubuntu1) UNRELEASED; urgency=medium
     - Ensure terminal state at end of test (LP: #1817660)
     - Various small test fixes.
     - Fix typos in documentation.
+  * debian/control: Update Maintainer for ubuntu upload.
 
  -- Mathieu Trudel-Lapierre <cyphermox@ubuntu.com>  Thu, 07 Mar 2019 09:53:01 -0500
 
