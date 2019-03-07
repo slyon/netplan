@@ -409,6 +409,10 @@ combine_dhcp_overrides(net_definition* def, dhcp_overrides* combined_dhcp_overri
             g_fprintf(stderr, DHCP_OVERRIDES_ERROR, def->id, "route-metric");
             exit(1);
         }
+        if (def->dhcp4_overrides.use_routes != def->dhcp6_overrides.use_routes) {
+            g_fprintf(stderr, DHCP_OVERRIDES_ERROR, def->id, "use-routes");
+            exit(1);
+        }
         /* Just use dhcp4_overrides now, since we know they are the same. */
         *combined_dhcp_overrides = def->dhcp4_overrides;
     }
@@ -767,7 +771,7 @@ write_networkd_conf(net_definition* def, const char* rootdir)
     }
 
     if (def->type == ND_WIFI || def->has_auth) {
-        g_autofree char* link = g_strjoin(NULL, rootdir ?: "", "/run/systemd/system/multi-user.target.wants/netplan-wpa@", def->id, ".service", NULL);
+        g_autofree char* link = g_strjoin(NULL, rootdir ?: "", "/run/systemd/system/systemd-networkd.service.wants/netplan-wpa@", def->id, ".service", NULL);
         if (def->type == ND_WIFI && def->has_match) {
             g_fprintf(stderr, "ERROR: %s: networkd backend does not support wifi with match:, only by interface name\n", def->id);
             exit(1);
@@ -800,7 +804,7 @@ cleanup_networkd_conf(const char* rootdir)
 {
     unlink_glob(rootdir, "/run/systemd/network/10-netplan-*");
     unlink_glob(rootdir, "/run/netplan/wpa-*.conf");
-    unlink_glob(rootdir, "/run/systemd/system/multi-user.target.wants/netplan-wpa@*.service");
+    unlink_glob(rootdir, "/run/systemd/system/systemd-networkd.service.wants/netplan-wpa@*.service");
     unlink_glob(rootdir, "/run/udev/rules.d/99-netplan-*");
 }
 
@@ -810,7 +814,7 @@ cleanup_networkd_conf(const char* rootdir)
 void
 enable_networkd(const char* generator_dir)
 {
-    g_autofree char* link = g_build_path(G_DIR_SEPARATOR_S, generator_dir, "multi-user.target.wants", "systemd-networkd.service", NULL);
+    g_autofree char* link = g_build_path(G_DIR_SEPARATOR_S, generator_dir, "network-online.target.wants", "systemd-networkd.service", NULL);
     g_debug("We created networkd configuration, adding %s enablement symlink", link);
     safe_mkdir_p_dir(link);
     if (symlink("../systemd-networkd.service", link) < 0 && errno != EEXIST) {
