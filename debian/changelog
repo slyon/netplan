@@ -1,3 +1,17 @@
+netplan.io (0.96-0ubuntu1) UNRELEASED; urgency=medium
+
+  * New upstream release 0.96.
+    - Moved netplan-wpa@ services to earlier at boot (LP: #1819014)
+    - Restart services when unconfiguring (LP: #1811868)
+    - Use the .nmconnection extension for NM keyfiles (LP: #1817655)
+    - Fixed integration tests runner to correctly report failures
+    - Enforce integrity for use-routes in networkd backend.
+    - Ensure terminal state at end of test (LP: #1817660)
+    - Various small test fixes.
+    - Fix typos in documentation.
+
+ -- Mathieu Trudel-Lapierre <cyphermox@ubuntu.com>  Thu, 07 Mar 2019 09:53:01 -0500
+
 netplan.io (0.95-2) unstable; urgency=medium
 
   * Set Priority to optional (Closes: #920327).
