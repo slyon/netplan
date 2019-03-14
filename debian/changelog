@@ -1,3 +1,11 @@
+netplan.io (0.96-0ubuntu2) UNRELEASED; urgency=medium
+
+  * d/p/0001-Automatically-skip-tests-when-wifi-is-clearly-unavai.patch:
+    Update wifi tests to try to make them more reliable.
+  * debian/tests/control: explicilty mark wifi tests flaky.
+
+ -- Mathieu Trudel-Lapierre <cyphermox@ubuntu.com>  Thu, 14 Mar 2019 14:09:34 -0400
+
 netplan.io (0.96-0ubuntu1) disco; urgency=medium
 
   * New upstream release 0.96.

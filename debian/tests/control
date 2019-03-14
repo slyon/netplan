@@ -55,7 +55,7 @@ Depends: @,
   network-manager,
   hostapd,
   dnsmasq-base,
-Restrictions: allow-stderr, needs-root, isolation-machine
+Restrictions: allow-stderr, needs-root, isolation-machine, flaky
 Features: test-name=wifi
 
 Test-Command: python3 tests/integration/run.py --test=tunnels
