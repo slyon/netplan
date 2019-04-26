@@ -1,0 +1,38 @@
+commit ebc212a3993be6d2ce8c382a743aac6c23e094cc
+Author: Mathieu Trudel-Lapierre <mathieu.trudel-lapierre@canonical.com>
+Date:   Tue Apr 23 17:46:37 2019 -0400
+
+    Revert "parser: fix explicit backend assignment due to file merging"
+    
+    This reverts commit fe1fac85ea6ee54384c97f221ea2c43afa70ea26.
+
+diff --git a/src/parse.c b/src/parse.c
+index 369de40..b370857 100644
+--- a/src/parse.c
++++ b/src/parse.c
+@@ -1985,7 +1985,7 @@ handle_network_type(yaml_document_t* doc, yaml_node_t* node, const void* data, G
+             /* create new network definition */
+             cur_netdef = g_new0(net_definition, 1);
+             cur_netdef->type = GPOINTER_TO_UINT(data);
+-            cur_netdef->backend = backend_cur_type ?: get_default_backend_for_type(cur_netdef->type);
++            cur_netdef->backend = backend_cur_type ?: BACKEND_NONE;
+             cur_netdef->id = g_strdup(scalar(key));
+ 
+             /* Set some default values */
+diff --git a/tests/generator/test_common.py b/tests/generator/test_common.py
+index 39c524c..e1f603f 100644
+--- a/tests/generator/test_common.py
++++ b/tests/generator/test_common.py
+@@ -1073,10 +1073,11 @@ class TestMerging(TestBase):
+     def test_global_backend(self):
+         self.generate('''network:
+   version: 2
++  renderer: NetworkManager
+   ethernets:
+     engreen:
+       dhcp4: y''',
+-                      confs={'backend': 'network:\n  renderer: NetworkManager'})
++                      confs={'backend': 'network:\n  renderer: networkd'})
+ 
+         self.assert_networkd({'engreen.network': ND_DHCP4 % 'engreen'})
+         self.assert_nm(None, '''[keyfile]

@@ -1,3 +1,17 @@
+netplan.io (0.96-0ubuntu5) UNRELEASED; urgency=medium
+
+  * debian/patches/git_revert_explicit_renderer_def_ebc212a.patch: revert
+    commit ebc212a: make renderer values explicit at the end of each parsing
+    pass; it breaks "default" renderer behavior when multiple files may set
+    a global renderer and expect the last to take effect globally.
+    (LP: #1825206)
+  * debian/patches/git_reorg_netdef_validation_181b583.patch: correct the
+    fallout from the above change: validate netdefs in a single pass at the
+    very end of parsing, once we know which is the applicable renderer. This
+    makes sure tunnels get validated correctly.
+
+ -- Mathieu Trudel-Lapierre <cyphermox@ubuntu.com>  Fri, 26 Apr 2019 15:05:15 -0400
+
 netplan.io (0.96-0ubuntu4) disco; urgency=medium
 
   * d/p/0001-Partially-revert-the-change-for-enabling-systemd-net.patch:
