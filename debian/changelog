@@ -1,3 +1,11 @@
+netplan.io (0.96-0ubuntu4) disco; urgency=medium
+
+  * d/p/0001-Partially-revert-the-change-for-enabling-systemd-net.patch:
+    Also update tests to account for moving the systemd-networkd.service
+    link.
+
+ -- Mathieu Trudel-Lapierre <cyphermox@ubuntu.com>  Thu, 28 Mar 2019 15:15:13 -0400
+
 netplan.io (0.96-0ubuntu3) disco; urgency=medium
 
   * d/p/0001-Partially-revert-the-change-for-enabling-systemd-net.patch:
