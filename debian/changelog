@@ -5,6 +5,7 @@ netplan.io (0.97-0ubuntu1) UNRELEASED; urgency=medium
     - Reworked renderer choosing to avoid regression in default renderer when
       multiple files specify it globally (LP: #1825206)
     - Fixed networkd activation. (LP: #1821867)
+  * Drop all patches; they are included in the upstream release.
 
  -- Mathieu Trudel-Lapierre <cyphermox@ubuntu.com>  Wed, 08 May 2019 16:35:48 -0400
 
