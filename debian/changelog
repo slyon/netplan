@@ -10,6 +10,8 @@ netplan.io (0.98-0ubuntu1) UNRELEASED; urgency=medium
     - Added support for "hash:" for hashed 802.1x passwords (LP: #1819831)
     - Tolerate devices without a /sys path (LP: #1810043)
     - Fix incorrect separator for networkd with ARP IP targets (LP: #1829264)
+  * debian/control: Add Build-Depends on libsystemd-dev for DBus feature, and
+    on dbus-x11 for dbus-launch used in tests.
 
  -- Mathieu Trudel-Lapierre <cyphermox@ubuntu.com>  Tue, 20 Aug 2019 13:57:23 -0400
 
