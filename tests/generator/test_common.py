@@ -18,7 +18,6 @@
 
 import os
 import textwrap
-import sys
 
 from .base import TestBase, ND_DHCP4, ND_DHCP6, ND_DHCPYES
 
@@ -80,8 +79,9 @@ UseMTU=true
               version: 2
               ethernets:
                 eth1:
-                  mtu: 1280
+                  mtu: 9000
                   dhcp4: n
+                  ipv6-mtu: 2000
               bonds:
                 bond0:
                   interfaces:
@@ -109,8 +109,8 @@ LinkLocalAddressing=ipv6
 ConfigureWithoutCarrier=yes
 VLAN=bond0.108
 ''',
-            'eth1.link': '[Match]\nOriginalName=eth1\n\n[Link]\nWakeOnLan=off\nMTUBytes=1280\n',
-            'eth1.network': '[Match]\nName=eth1\n\n[Network]\nLinkLocalAddressing=no\nBond=bond0\n'
+            'eth1.link': '[Match]\nOriginalName=eth1\n\n[Link]\nWakeOnLan=off\nMTUBytes=9000\n',
+            'eth1.network': '[Match]\nName=eth1\n\n[Network]\nLinkLocalAddressing=no\nIPv6MTUBytes=2000\nBond=bond0\n'
         })
         self.assert_networkd_udev(None)
 
@@ -576,6 +576,16 @@ method=link-local
 method=ignore
 ''',
         })
+
+    def test_ipv6_mtu(self):
+        self.generate(textwrap.dedent("""
+            network:
+              version: 2
+              renderer: NetworkManager
+              ethernets:
+                eth1:
+                  mtu: 9000
+                  ipv6-mtu: 2000"""), expect_fail=True)
 
     def test_eth_global_renderer(self):
         self.generate('''network:
@@ -1252,4 +1262,3 @@ LinkLocalAddressing=ipv6
 ''',
                               'enyellow.network': ND_DHCP4 % 'enyellow',
                               'enblue.network': ND_DHCP4 % 'enblue'})
-

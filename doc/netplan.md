@@ -163,6 +163,12 @@ Virtual devices
     Note that **``rdnssd``**(8) is required to use RDNSS with networkd. No extra
     software is required for NetworkManager.
 
+``ipv6-mtu`` (scalar)
+:   Set the IPv6 MTU (only supported with `networkd` backend). Note
+    that needing to set this is an unusual requirement.
+
+    **Requires feature: ipv6-mtu**
+
 ``ipv6-privacy`` (bool)
 
 :   Enable IPv6 Privacy Extensions (RFC 4941) for the specified interface, and
@@ -387,6 +393,17 @@ client processes as specified in the netplan YAML.
           Use this to prioritize routes for devices by setting a higher metric
           on a preferred interface. Available for both the ``networkd`` and
           ``NetworkManager`` backends.
+
+     ``use-domains`` (scalar)
+     :    Takes a boolean, or the special value "route". When true, the domain 
+          name received from the DHCP server will be used as DNS search domain
+          over this link, similar to the effect of the Domains= setting. If set
+          to "route", the domain name received from the DHCP server will be 
+          used for routing DNS queries only, but not for searching, similar to
+          the effect of the Domains= setting when the argument is prefixed with
+          "~".
+
+          **Requires feature: dhcp-use-domains**
 
 
 ## Routing
@@ -725,14 +742,16 @@ wpasupplicant installed if you let the ``networkd`` renderer handle wifi.
      ``up-delay`` (scalar)
      :    Specify the delay before enabling a link once the link is physically
           up. The default value is ``0``. This maps to the UpDelaySec= property
-          for the networkd renderer. If no time suffix is specified, the value
-          will be interpreted as milliseconds.
+          for the networkd renderer. This option is only valid for the miimon
+          link monitor. If no time suffix is specified, the value will be
+          interpreted as milliseconds.
 
      ``down-delay`` (scalar)
      :    Specify the delay before disabling a link once the link has been
           lost. The default value is ``0``. This maps to the DownDelaySec=
-          property for the networkd renderer. If no time suffix is specified,
-          the value will be interpreted as milliseconds.
+          property for the networkd renderer. This option is only valid for the
+          miimon link monitor. If no time suffix is specified, the value will
+          be interpreted as milliseconds.
 
      ``fail-over-mac-policy`` (scalar)
      :    Set whether to set all slaves to the same MAC address when adding
