@@ -31,6 +31,7 @@
 
 GString* udev_rules;
 
+
 /**
  * Append NM device specifier of @def to @s.
  */
@@ -431,6 +432,11 @@ write_nm_conf_access_point(net_definition* def, const char* rootdir, const wifi_
     if (def->bond)
         g_string_append_printf(s, "slave-type=bond\nmaster=%s\n", def->bond);
 
+    if (def->ipv6_mtubytes) {
+        g_fprintf(stderr, "ERROR: %s: NetworkManager definitions do not support ipv6-mtu\n", def->id);
+        exit(1);
+    }
+
     if (def->type < ND_VIRTUAL) {
         GString *link_str = NULL;
 
@@ -632,9 +638,9 @@ write_nm_conf(net_definition* def, const char* rootdir)
 }
 
 static void
-nd_append_non_nm_ids(gpointer key, gpointer value, gpointer str)
+nd_append_non_nm_ids(gpointer data, gpointer str)
 {
-    net_definition* nd = value;
+    net_definition* nd = data;
 
     if (nd->backend != BACKEND_NM) {
         if (nd->match.driver) {
@@ -662,7 +668,7 @@ write_nm_conf_finish(const char* rootdir)
      * auto-connect and interferes */
     s = g_string_new("[keyfile]\n# devices managed by networkd\nunmanaged-devices+=");
     len = s->len;
-    g_hash_table_foreach(netdefs, nd_append_non_nm_ids, s);
+    g_list_foreach(netdefs_ordered, nd_append_non_nm_ids, s);
     if (s->len > len)
         g_string_free_to_file(s, rootdir, "run/NetworkManager/conf.d/netplan.conf", NULL);
     else

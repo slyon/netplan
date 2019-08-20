@@ -27,6 +27,7 @@
 #include "parse.h"
 #include "util.h"
 
+
 /**
  * Append [Match] section of @def to @s.
  */
@@ -205,7 +206,7 @@ write_bond_parameters(net_definition* def, GString* s)
         g_string_append_printf(params, "\nARPIPTargets=");
         for (unsigned i = 0; i < def->bond_params.arp_ip_targets->len; ++i) {
             if (i > 0)
-                g_string_append_printf(params, ",");
+                g_string_append_printf(params, " ");
             g_string_append_printf(params, "%s", g_array_index(def->bond_params.arp_ip_targets, char*, i));
         }
     }
@@ -385,6 +386,10 @@ combine_dhcp_overrides(net_definition* def, dhcp_overrides* combined_dhcp_overri
             g_fprintf(stderr, DHCP_OVERRIDES_ERROR, def->id, "use-dns");
             exit(1);
         }
+        if (g_strcmp0(def->dhcp4_overrides.use_domains, def->dhcp6_overrides.use_domains) != 0){
+            g_fprintf(stderr, DHCP_OVERRIDES_ERROR, def->id, "use-domains");
+            exit(1);
+        }
         if (def->dhcp4_overrides.use_ntp != def->dhcp6_overrides.use_ntp) {
             g_fprintf(stderr, DHCP_OVERRIDES_ERROR, def->id, "use-ntp");
             exit(1);
@@ -494,6 +499,10 @@ write_network_file(net_definition* def, const char* rootdir, const char* path)
         g_string_append(network, "\n");
     }
 
+    if (def->ipv6_mtubytes) {
+        g_string_append_printf(network, "IPv6MTUBytes=%d\n", def->ipv6_mtubytes);
+    }
+
     if (def->type >= ND_VIRTUAL)
         g_string_append(network, "ConfigureWithoutCarrier=yes\n");
 
@@ -516,12 +525,13 @@ write_network_file(net_definition* def, const char* rootdir, const char* path)
 
     if (def->has_vlans) {
         /* iterate over all netdefs to find VLANs attached to us */
-        GHashTableIter i;
+        GList *l = netdefs_ordered;
         net_definition* nd;
-        g_hash_table_iter_init(&i, netdefs);
-        while (g_hash_table_iter_next (&i, NULL, (gpointer*) &nd))
+        for (; l != NULL; l = l->next) {
+            nd = l->data;
             if (nd->vlan_link == def)
                 g_string_append_printf(network, "VLAN=%s\n", nd->id);
+        }
     }
 
     if (def->routes != NULL) {
@@ -570,6 +580,8 @@ write_network_file(net_definition* def, const char* rootdir, const char* path)
             g_string_append_printf(network, "UseRoutes=false\n");
         if (!combined_dhcp_overrides.use_dns)
             g_string_append_printf(network, "UseDNS=false\n");
+        if (combined_dhcp_overrides.use_domains)
+            g_string_append_printf(network, "UseDomains=%s\n", combined_dhcp_overrides.use_domains);
         if (!combined_dhcp_overrides.use_ntp)
             g_string_append_printf(network, "UseNTP=false\n");
         if (!combined_dhcp_overrides.send_hostname)
@@ -692,7 +704,11 @@ append_wpa_auth_conf(GString* s, const authentication_settings* auth)
         if (auth->key_management == KEY_MANAGEMENT_WPA_PSK) {
             g_string_append_printf(s, "  psk=\"%s\"\n", auth->password);
         } else {
-            g_string_append_printf(s, "  password=\"%s\"\n", auth->password);
+            if (strncmp(auth->password, "hash:", 5) == 0) {
+                g_string_append_printf(s, "  password=%s\n", auth->password);
+            } else {
+                g_string_append_printf(s, "  password=\"%s\"\n", auth->password);
+            }
         }
     }
     if (auth->ca_certificate) {

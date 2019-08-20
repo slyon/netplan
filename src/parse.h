@@ -20,6 +20,9 @@
 #include <uuid.h>
 #include <yaml.h>
 
+#define NETPLAN_VERSION_MIN	2
+#define NETPLAN_VERSION_MAX	3
+
 
 /* file that is currently being processed, for useful error messages */
 const char* current_file;
@@ -161,6 +164,7 @@ typedef struct dhcp_overrides {
     gboolean use_hostname;
     gboolean use_mtu;
     gboolean use_routes;
+    char* use_domains; /* netplan-feature: dhcp-use-domains */
     char* hostname;
     guint metric;
 } dhcp_overrides;
@@ -216,6 +220,9 @@ typedef struct net_definition {
 
     /* interface mtu */
     guint mtubytes;
+    /* ipv6 mtu */
+    /* netplan-feature: ipv6-mtu */
+    guint ipv6_mtubytes;
 
     /* these properties are only valid for physical interfaces (type < ND_VIRTUAL) */
     char* set_name;
