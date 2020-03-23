@@ -5,6 +5,9 @@ Depends: @,
   network-manager,
   hostapd,
   dnsmasq-base,
+  libnm0,
+  python3-gi,
+  gir1.2-nm-1.0,
 Restrictions: allow-stderr, needs-root, isolation-machine
 Features: test-name=ethernets
 
@@ -15,6 +18,9 @@ Depends: @,
   network-manager,
   hostapd,
   dnsmasq-base,
+  libnm0,
+  python3-gi,
+  gir1.2-nm-1.0,
 Restrictions: allow-stderr, needs-root, isolation-machine
 Features: test-name=bridges
 
@@ -25,6 +31,9 @@ Depends: @,
   network-manager,
   hostapd,
   dnsmasq-base,
+  libnm0,
+  python3-gi,
+  gir1.2-nm-1.0,
 Restrictions: allow-stderr, needs-root, isolation-machine
 Features: test-name=bonds
 
@@ -35,6 +44,9 @@ Depends: @,
   network-manager,
   hostapd,
   dnsmasq-base,
+  libnm0,
+  python3-gi,
+  gir1.2-nm-1.0,
 Restrictions: allow-stderr, needs-root, isolation-machine
 Features: test-name=routing
 
@@ -45,6 +57,9 @@ Depends: @,
   network-manager,
   hostapd,
   dnsmasq-base,
+  libnm0,
+  python3-gi,
+  gir1.2-nm-1.0,
 Restrictions: allow-stderr, needs-root, isolation-machine
 Features: test-name=vlans
 
@@ -55,6 +70,9 @@ Depends: @,
   network-manager,
   hostapd,
   dnsmasq-base,
+  libnm0,
+  python3-gi,
+  gir1.2-nm-1.0,
 Restrictions: allow-stderr, needs-root, isolation-machine, flaky
 Features: test-name=wifi
 
@@ -65,6 +83,9 @@ Depends: @,
   network-manager,
   hostapd,
   dnsmasq-base,
+  libnm0,
+  python3-gi,
+  gir1.2-nm-1.0,
 Restrictions: allow-stderr, needs-root, isolation-machine
 Features: test-name=tunnels
 
@@ -75,6 +96,9 @@ Depends: @,
   network-manager,
   hostapd,
   dnsmasq-base,
+  libnm0,
+  python3-gi,
+  gir1.2-nm-1.0,
 Restrictions: allow-stderr, needs-root, isolation-machine
 Features: test-name=scenarios
 
@@ -85,6 +109,9 @@ Depends: @,
   network-manager,
   hostapd,
   dnsmasq-base,
+  libnm0,
+  python3-gi,
+  gir1.2-nm-1.0,
 Restrictions: allow-stderr, needs-root, isolation-machine
 Features: test-name=regressions
 
