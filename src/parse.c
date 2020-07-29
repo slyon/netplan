@@ -799,6 +799,16 @@ const mapping_entry_handler address_option_handlers[] = {
     {NULL}
 };
 
+static gboolean addr_options_equals(NetplanAddressOptions* a, NetplanAddressOptions* b)
+{
+    if ((!a && b) || (a && !b) ||
+        g_strcmp0(a->address, b->address) ||
+        g_strcmp0(a->lifetime, b->lifetime) ||
+        g_strcmp0(a->label, b->label))
+        return FALSE;
+    return TRUE;
+}
+
 static gboolean
 handle_addresses(yaml_document_t* doc, yaml_node_t* node, const void* _, GError** error)
 {
@@ -841,6 +851,17 @@ handle_addresses(yaml_document_t* doc, yaml_node_t* node, const void* _, GError*
 
             if (!process_mapping(doc, value, address_option_handlers, error))
                 return FALSE;
+
+            // check if we've already done a first pass on the yaml
+            for (unsigned i = 0; i < cur_netdef->address_options->len; i++) {
+                if (addr_options_equals(cur_addr_option, g_array_index(cur_netdef->address_options, NetplanAddressOptions*, i))) {
+                    g_free(cur_addr_option->address);
+                    g_free(cur_addr_option->label);
+                    g_free(cur_addr_option->lifetime);
+                    g_free(cur_addr_option);
+                    return TRUE;
+                }
+            }
 
             g_array_append_val(cur_netdef->address_options, cur_addr_option);
             continue;
