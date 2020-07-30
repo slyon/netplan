@@ -799,16 +799,6 @@ const mapping_entry_handler address_option_handlers[] = {
     {NULL}
 };
 
-static gboolean addr_options_equals(NetplanAddressOptions* a, NetplanAddressOptions* b)
-{
-    if ((!a && b) || (a && !b) ||
-        g_strcmp0(a->address, b->address) ||
-        g_strcmp0(a->lifetime, b->lifetime) ||
-        g_strcmp0(a->label, b->label))
-        return FALSE;
-    return TRUE;
-}
-
 static gboolean
 handle_addresses(yaml_document_t* doc, yaml_node_t* node, const void* _, GError** error)
 {
@@ -846,24 +836,21 @@ handle_addresses(yaml_document_t* doc, yaml_node_t* node, const void* _, GError*
             if (!cur_netdef->address_options)
                 cur_netdef->address_options = g_array_new(FALSE, FALSE, sizeof(NetplanAddressOptions*));
 
+            for (unsigned i = 0; i < cur_netdef->address_options->len; ++i) {
+                NetplanAddressOptions* opts = g_array_index(cur_netdef->address_options, NetplanAddressOptions*, i);
+                /* Skip if options already exist for this address, this can happen during multip-pass parsing. */
+                if (!g_strcmp0(scalar(key), opts->address))
+                    goto skip_opts;
+            }
+
             cur_addr_option = g_new0(NetplanAddressOptions, 1);
             cur_addr_option->address = g_strdup(scalar(key));
 
             if (!process_mapping(doc, value, address_option_handlers, error))
                 return FALSE;
 
-            // check if we've already done a first pass on the yaml
-            for (unsigned i = 0; i < cur_netdef->address_options->len; i++) {
-                if (addr_options_equals(cur_addr_option, g_array_index(cur_netdef->address_options, NetplanAddressOptions*, i))) {
-                    g_free(cur_addr_option->address);
-                    g_free(cur_addr_option->label);
-                    g_free(cur_addr_option->lifetime);
-                    g_free(cur_addr_option);
-                    return TRUE;
-                }
-            }
-
             g_array_append_val(cur_netdef->address_options, cur_addr_option);
+skip_opts:
             continue;
         }
 
