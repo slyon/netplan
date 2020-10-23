@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: Unittests and coverage
+name: Unit tests & Coverage
 
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the master branch
@@ -21,11 +21,6 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
-      - uses: codecov/codecov-action@v1
-        with:
-          name: codecov-umbrella # optional
-          fail_ci_if_error: true # optional (default = false)
-          verbose: true # optional (default = false)
 
       # Install build depends
       - name: Install build depends
@@ -35,10 +30,14 @@ jobs:
           sudo apt install lcov python3-coverage curl
           sudo apt build-dep netplan.io
 
-      # Run tests and coverage
-      - name: Tests
+      # Run tests with coverage
+      - name: Run unit tests
         run: make coverage
 
       # Check coverage
-      - name: codecov
-        run: bash <(curl -s https://codecov.io/bash) # Upload to Codecov
+      - name: Upload coverage to codecov
+        uses: codecov/codecov-action@v1
+        with:
+          name: check-coverage # optional
+          fail_ci_if_error: true # optional (default = false)
+          verbose: true # optional (default = false)
