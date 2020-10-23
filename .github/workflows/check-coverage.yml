@@ -27,9 +27,13 @@ jobs:
         run: |
           sudo sed -i '/deb-src/s/^# //' /etc/apt/sources.list
           sudo apt update
-          sudo apt install lcov python3-coverage
+          sudo apt install lcov python3-coverage curl
           sudo apt build-dep netplan.io
 
-      # Run tests and check coverage
-      - name: check-coverage
-        run: make check-coverage
+      # Run tests
+      - name: check
+        run: make check
+
+      # Check coverage
+      - name: codecov
+        run: bash <(curl -s https://codecov.io/bash) # Upload to Codecov
