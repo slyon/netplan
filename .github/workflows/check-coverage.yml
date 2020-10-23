@@ -35,9 +35,9 @@ jobs:
           sudo apt install lcov python3-coverage curl
           sudo apt build-dep netplan.io
 
-      # Run tests
-      - name: check
-        run: make check
+      # Run tests and coverage
+      - name: Tests
+        run: make coverage
 
       # Check coverage
       - name: codecov
