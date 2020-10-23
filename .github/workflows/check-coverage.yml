@@ -22,12 +22,13 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
 
-      # Runs a single command using the runners shell
+      # Install build depends
       - name: Install build depends
-        run: sudo apt build-dep netplan.io
-
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
         run: |
-          make check-coverage
-          echo test, and deploy your project.
+          sudo sed -i '/deb-src/s/^# //' /etc/apt/sources.list
+          sudo apt update
+          sudo apt build-dep netplan.io
+
+      # Run tests and check coverage
+      - name: check-coverage
+        run: make check-coverage
