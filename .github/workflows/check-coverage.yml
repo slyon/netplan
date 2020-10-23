@@ -35,7 +35,7 @@ jobs:
         run: make coverage
 
       # Check coverage
-      - name: Upload coverage to codecov
+      - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v1
         with:
           name: check-coverage # optional
