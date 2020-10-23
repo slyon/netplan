@@ -28,7 +28,7 @@ jobs:
           sudo sed -i '/deb-src/s/^# //' /etc/apt/sources.list
           sudo apt update
           sudo apt build-dep netplan.io
-          sudo apt install lcov libjs-jquery-throttle-debounce
+          sudo apt install lcov libjs-jquery-throttle-debounce libjs-jquery-isonscreen
 
       # Run tests and check coverage
       - name: check-coverage
