@@ -27,7 +27,7 @@ jobs:
         run: |
           sudo sed -i '/deb-src/s/^# //' /etc/apt/sources.list
           sudo apt update
-          sudo apt install lcov python3-coverage #libjs-jquery-throttle-debounce libjs-jquery-isonscreen libjs-jquery-tablesorter libjs-jquery
+          sudo apt install lcov python3-coverage
           sudo apt build-dep netplan.io
 
       # Run tests and check coverage
