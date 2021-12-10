@@ -1,0 +1,43 @@
+name: Autopkgtest CI
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events but only for the main branch
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ '**' ]
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  autopkgtest:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-20.04
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+      - run: |
+          git fetch --unshallow --tags
+
+      - name: Install dependencies
+        run: |
+          sudo sed -i '/deb-src/s/^# //' /etc/apt/sources.list
+          sudo apt update
+          sudo apt install autopkgtest ubuntu-dev-tools devscripts qemu-system-x86 openvswitch-switch
+          sudo snap install lxd
+          sudo lxd init --auto --storage-backend=dir
+
+      - name: Prepare test
+        run: |
+          pull-lp-source netplan.io
+          cp -r netplan.io-*/debian .
+          rm -r debian/patches/  # clear any distro patches
+          rm debian/libnetplan0.symbols  #XXX: make shlibs happy (workaround for ABI break)
+          dch -v $(git describe --tags) "Autopkgtest CI testing"
+          sudo autopkgtest-build-lxd ubuntu-daily:jammy
+
+      - name: Run autopkgtest (incl. build)
+        run: |
+          sudo autopkgtest . -U -- lxd autopkgtest/ubuntu/jammy/amd64
