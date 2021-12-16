@@ -34,13 +34,12 @@ jobs:
           pull-lp-source netplan.io
           cp -r netplan.io-*/debian .
           rm -r debian/patches/  # clear any distro patches
-          rm debian/libnetplan0.symbols  #XXX: make shlibs happy (workaround for ABI break)
           dch -v $(git describe --tags) "Autopkgtest CI testing (Jammy)"
           sudo autopkgtest-build-lxd ubuntu-daily:jammy
 
       - name: Run autopkgtest (incl. build)
         run: |
-          sudo autopkgtest . -U -- lxd autopkgtest/ubuntu/jammy/amd64
+          sudo autopkgtest . -U --env=DPKG_GENSYMBOLS_CHECK_LEVEL=0 -- lxd autopkgtest/ubuntu/jammy/amd64
   lxc-debian-sid:
     # The type of runner that the job will run on
     runs-on: ubuntu-20.04
