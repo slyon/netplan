@@ -36,6 +36,18 @@ jobs:
           rm -r debian/patches/  # clear any distro patches
           rm debian/libnetplan0.symbols  #XXX: make shlibs happy (workaround for ABI break)
           dch -v $(git describe --tags) "Autopkgtest CI testing (Jammy)"
+          # work around LP: #1878225 as fallback
+          sudo patch /usr/bin/autopkgtest-build-lxd <<'EOF'
+@@ -70,6 +70,8 @@
+ 
+     sleep 5
+     if lxc exec "$CONTAINER" -- systemctl mask serial-getty@getty.service; then
++       lxc exec "$CONTAINER" -- systemctl mask snapd.service
++       lxc exec "$CONTAINER" -- systemctl mask snapd.seeded.service
+        lxc exec "$CONTAINER" -- reboot
+     fi
+ 
+EOF
           sudo autopkgtest-build-lxd ubuntu-daily:jammy
 
       - name: Run autopkgtest (incl. build)
