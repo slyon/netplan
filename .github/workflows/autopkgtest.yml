@@ -27,13 +27,17 @@ jobs:
           sudo apt install autopkgtest ubuntu-dev-tools devscripts openvswitch-switch
           sudo snap install lxd
           sudo lxd init --auto --storage-backend=dir
+      - name: Patching and building autopkgtest-build-lxc (LP: #1878225)
+        run: |
+          # work around LP: #1878225 as fallback
+          sudo patch /usr/bin/autopkgtest-build-lxd .github/workflows/autopkgtest.patch
+          sudo autopkgtest-build-lxd ubuntu-daily:jammy
       - name: Prepare test
         run: |
           pull-lp-source netplan.io
           cp -r netplan.io-*/debian .
           rm -r debian/patches/  # clear any distro patches
           dch -v $(git describe --tags) "Autopkgtest CI testing (Jammy)"
-          sudo autopkgtest-build-lxd ubuntu-daily:jammy
       - name: Run autopkgtest (incl. build)
         run: |
           sudo autopkgtest . -U --env=DPKG_GENSYMBOLS_CHECK_LEVEL=0 -- lxd autopkgtest/ubuntu/jammy/amd64
