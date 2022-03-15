@@ -1215,12 +1215,6 @@ handle_bridge_interfaces(NetplanParser* npp, yaml_node_t* node, const void* data
                 g_debug("%s: Bridge contains openvswitch interface, choosing OVS backend", npp->current.netdef->id);
                 npp->current.netdef->backend = NETPLAN_BACKEND_OVS;
             }
-            /* If the bridge has a OVS backend then any gretap or ip6gretap tunnels attached to the bridge must also be OVS */
-            if (component->type == NETPLAN_DEF_TYPE_TUNNEL &&
-                    (component->tunnel.mode == NETPLAN_TUNNEL_MODE_GRETAP || component->tunnel.mode == NETPLAN_TUNNEL_MODE_IP6GRETAP) &&
-                    npp->current.netdef->backend == NETPLAN_BACKEND_OVS) {
-                component->backend = NETPLAN_BACKEND_OVS;
-            }
         }
     }
 
@@ -2758,6 +2752,17 @@ netplan_parser_load_yaml(NetplanParser* npp, const char* filename, GError** erro
 static gboolean
 finish_iterator(const NetplanParser* npp, NetplanNetDefinition* nd, GError **error)
 {
+    /* If a bridge has a OVS backend then any gretap or ip6gretap tunnels attached to the bridge must also be OVS */
+    if (nd->type == NETPLAN_DEF_TYPE_TUNNEL && nd->bridge &&
+            (nd->tunnel.mode == NETPLAN_TUNNEL_MODE_GRETAP || nd->tunnel.mode == NETPLAN_TUNNEL_MODE_IP6GRETAP)) {
+        char *parent = nd->bridge;
+        NetplanNetDefinition *parent_nd = g_hash_table_lookup(npp->parsed_defs, parent);
+        if (parent_nd && parent_nd->backend == NETPLAN_BACKEND_OVS) {
+            g_debug("%s: setting backend to OVS implicitly (interface of %s)", nd->id, parent);
+            nd->backend = NETPLAN_BACKEND_OVS;
+        }
+    }
+
     /* Take more steps to make sure we always have a backend set for netdefs */
     if (nd->backend == NETPLAN_BACKEND_NONE) {
         nd->backend = get_default_backend_for_type(npp->global_backend, nd->type);

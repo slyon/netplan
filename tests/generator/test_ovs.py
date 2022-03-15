@@ -1030,3 +1030,45 @@ ExecStart=/usr/bin/ovs-vsctl --may-exist add-port ovs-br non-ovs-bond
 ''', expect_fail=True)
         self.assert_ovs({'cleanup.service': OVS_CLEANUP % {'iface': 'cleanup'}})
         self.assertIn('br0: ipv6-address-generation mode is not supported by networkd', err)
+
+    def test_ovs_tunnel_implicit(self):
+        self.generate('''network:
+  version: 2
+  renderer: networkd
+  tunnels:
+    gre0:
+      mode: gretap
+      #openvswitch: {} # this is added implicitly, being an interface of br0
+      local: 172.16.0.1
+      remote: 172.16.0.2
+      key: 1000
+  bridges:
+    br0:
+      interfaces: ["gre0"]
+      addresses:
+        - 10.0.0.1/24
+      openvswitch: {}
+''', skip_generated_yaml_validation=True)  # Doesn't generate the default openvswitch: {} stanza for gre0
+        self.assert_ovs({'br0.service': OVS_VIRTUAL % {'iface': 'br0', 'extra': '''
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/ovs-vsctl --may-exist add-br br0
+ExecStart=/usr/bin/ovs-vsctl --may-exist add-port br0 gre0
+''' + OVS_BR_DEFAULT % {'iface': 'br0'}},
+                         'gre0.service': OVS_VIRTUAL % {'iface': 'gre0', 'extra': '''\
+Requires=netplan-ovs-br0.service
+After=netplan-ovs-br0.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/ovs-vsctl --may-exist add-port br0 gre0 -- set interface gre0 type=gre options:remote_ip=172.16.0.2
+ExecStart=/usr/bin/ovs-vsctl set interface gre0 options:local_ip=172.16.0.1
+ExecStart=/usr/bin/ovs-vsctl set interface gre0 options:out_key=1000
+ExecStart=/usr/bin/ovs-vsctl set interface gre0 options:in_key=1000
+ExecStart=/usr/bin/ovs-vsctl set Port gre0 external-ids:netplan=true
+'''},
+                         'cleanup.service': OVS_CLEANUP % {'iface': 'cleanup'}})
+        # Confirm that the networkd config is still sane
+        self.assert_networkd({'br0.network': (ND_EMPTY % ('br0', 'ipv6'))
+                              .replace('ConfigureWithoutCarrier=yes', 'Address=10.0.0.1/24\nConfigureWithoutCarrier=yes'),
+                              'gre0.network': ND_EMPTY % ('gre0', 'no')})
