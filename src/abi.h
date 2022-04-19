@@ -360,4 +360,41 @@ struct netplan_net_definition {
 
     /* netplan-feature: regdom */
     char* regulatory_domain;
+
+    /* vrf */
+    /* netplan-feature: vrf */
+    char* vrf;
+    guint vrf_table;
+
+    /* vxlan */
+    /* netplan-feature: vxlan */
+    guint vxlan_vni;
+    GArray* vxlans;
+    gboolean neigh_suppress;
+
+    struct {
+        char* remote;
+        char* local;
+        char* group;
+        guint tos;
+        guint ttl;
+        gboolean mac_learning;
+        guint fdb_ageing;
+        guint max_fdb_entries;
+        gboolean reduce_arp_proxy;
+        gboolean l2_miss_notification;
+        gboolean l3_miss_notification;
+        gboolean route_short_circuit;
+        gboolean udp_checksum;
+        gboolean udp6_zero_checksum_tx;
+        gboolean udp6_zero_checksum_rx;
+        gboolean remote_checksum_tx;
+        gboolean remote_checksum_rx;
+        gboolean group_policy_extension;
+        gboolean generic_protocol_extension;
+        guint destination_port;
+        GArray* source_port_range;
+        guint flow_label;
+        gboolean ip_do_not_fragment;
+    } vxlan_params;
 };

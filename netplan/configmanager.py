@@ -60,6 +60,8 @@ class ConfigManager(object):
         interfaces.update(self.np_state.bonds)
         interfaces.update(self.np_state.tunnels)
         interfaces.update(self.np_state.vlans)
+        interfaces.update(self.np_state.vxlans)
+        interfaces.update(self.np_state.vrfs)
         return interfaces
 
     def parse(self, extra_config=None):

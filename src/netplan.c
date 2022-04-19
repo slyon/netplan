@@ -194,6 +194,73 @@ err_path: return FALSE; // LCOV_EXCL_LINE
 }
 
 static gboolean
+write_vxlan_params(yaml_event_t* event, yaml_emitter_t* emitter, const NetplanNetDefinition* def)
+{
+    if (DIRTY(def, def->vxlan_params)
+        || def->vxlan_params.remote
+        || def->vxlan_params.local
+        || def->vxlan_params.group
+        || def->vxlan_params.tos
+        || def->vxlan_params.ttl
+        || def->vxlan_params.mac_learning
+        || def->vxlan_params.fdb_ageing
+        || def->vxlan_params.max_fdb_entries
+        || def->vxlan_params.reduce_arp_proxy
+        || def->vxlan_params.l2_miss_notification
+        || def->vxlan_params.l3_miss_notification
+        || def->vxlan_params.route_short_circuit
+        || def->vxlan_params.udp_checksum
+        || def->vxlan_params.udp6_zero_checksum_tx
+        || def->vxlan_params.udp6_zero_checksum_rx
+        || def->vxlan_params.remote_checksum_tx
+        || def->vxlan_params.remote_checksum_rx
+        || def->vxlan_params.group_policy_extension
+        || def->vxlan_params.generic_protocol_extension
+        || def->vxlan_params.destination_port
+        || def->vxlan_params.flow_label
+        || def->vxlan_params.ip_do_not_fragment
+        || def->vxlan_params.source_port_range) {
+        YAML_SCALAR_PLAIN(event, emitter, "parameters");
+        YAML_MAPPING_OPEN(event, emitter);
+        YAML_STRING(def, event, emitter, "remote", def->vxlan_params.remote);
+        YAML_STRING(def, event, emitter, "local", def->vxlan_params.local);
+        YAML_STRING(def, event, emitter, "group", def->vxlan_params.group);
+        YAML_UINT_0(def, event, emitter, "tos", def->vxlan_params.tos);
+        YAML_UINT_0(def, event, emitter, "ttl", def->vxlan_params.ttl);
+        YAML_BOOL_FALSE(def, event, emitter, "mac-learning", def->vxlan_params.mac_learning);
+        YAML_UINT_0(def, event, emitter, "fdb-ageing", def->vxlan_params.fdb_ageing);
+        YAML_UINT_0(def, event, emitter, "max-fdb-entries", def->vxlan_params.max_fdb_entries);
+        YAML_BOOL_FALSE(def, event, emitter, "reduce-arp-proxy", def->vxlan_params.reduce_arp_proxy);
+        YAML_BOOL_FALSE(def, event, emitter, "l2-miss-notification", def->vxlan_params.l2_miss_notification);
+        YAML_BOOL_FALSE(def, event, emitter, "l3-miss-notification", def->vxlan_params.l3_miss_notification);
+        YAML_BOOL_FALSE(def, event, emitter, "route-short-circuit", def->vxlan_params.route_short_circuit);
+        YAML_BOOL_FALSE(def, event, emitter, "udp-checksum", def->vxlan_params.udp_checksum);
+        YAML_BOOL_FALSE(def, event, emitter, "udp6-zero-checksum-tx", def->vxlan_params.udp6_zero_checksum_tx);
+        YAML_BOOL_FALSE(def, event, emitter, "udp6-zero-checksum-rx", def->vxlan_params.udp6_zero_checksum_rx);
+        YAML_BOOL_FALSE(def, event, emitter, "remote-checksum-tx", def->vxlan_params.remote_checksum_tx);
+        YAML_BOOL_FALSE(def, event, emitter, "remote-checksum-rx", def->vxlan_params.remote_checksum_rx);
+        YAML_BOOL_FALSE(def, event, emitter, "group-policy-extension", def->vxlan_params.group_policy_extension);
+        YAML_BOOL_FALSE(def, event, emitter, "generic-protocol-extension", def->vxlan_params.generic_protocol_extension);
+        YAML_UINT_0(def, event, emitter, "destination-port", def->vxlan_params.destination_port);
+        YAML_UINT_0(def, event, emitter, "flow-label", def->vxlan_params.flow_label);
+        YAML_BOOL_FALSE(def, event, emitter, "ip-do-not-fragment", def->vxlan_params.ip_do_not_fragment);
+        if (def->vxlan_params.source_port_range || DIRTY(def, def->vxlan_params.source_port_range)) {
+            GArray* arr = def->vxlan_params.source_port_range;
+            YAML_SCALAR_PLAIN(event, emitter, "source-port-range");
+            YAML_SEQUENCE_OPEN(event, emitter);
+            if (arr) {
+                for (unsigned i = 0; i < arr->len; ++i)
+                    YAML_SCALAR_PLAIN(event, emitter, g_array_index(arr, char*, i));
+            }
+            YAML_SEQUENCE_CLOSE(event, emitter);
+        }
+        YAML_MAPPING_CLOSE(event, emitter);
+    }
+    return TRUE;
+err_path: return FALSE; // LCOV_EXCL_LINE
+}
+
+static gboolean
 write_bridge_params(yaml_event_t* event, yaml_emitter_t* emitter, const NetplanNetDefinition* def, const GArray *interfaces)
 {
     if (def->custom_bridging || DIRTY_COMPLEX(def, def->bridge_params)) {
@@ -702,12 +769,12 @@ _serialize_yaml(
                    def->sriov_delay_virtual_functions_rebind);
 
     /* Search interfaces */
-    if (def->type == NETPLAN_DEF_TYPE_BRIDGE || def->type == NETPLAN_DEF_TYPE_BOND) {
+    if (def->type == NETPLAN_DEF_TYPE_BRIDGE || def->type == NETPLAN_DEF_TYPE_BOND || def->type == NETPLAN_DEF_TYPE_VRF) {
         tmp_arr = g_array_new(FALSE, FALSE, sizeof(NetplanNetDefinition*));
         g_hash_table_iter_init(&iter, np_state->netdefs);
         while (g_hash_table_iter_next (&iter, &key, &value)) {
             NetplanNetDefinition *nd = (NetplanNetDefinition *) value;
-            if (g_strcmp0(nd->bond, def->id) == 0 || g_strcmp0(nd->bridge, def->id) == 0)
+            if (g_strcmp0(nd->bond, def->id) == 0 || g_strcmp0(nd->bridge, def->id) == 0 || g_strcmp0(nd->vrf, def->id) == 0)
                 g_array_append_val(tmp_arr, nd);
         }
         if (tmp_arr->len > 0) {
@@ -724,6 +791,7 @@ _serialize_yaml(
         g_array_free(tmp_arr, TRUE);
     }
 
+    write_vxlan_params(event, emitter, def);
     write_routes(event, emitter, def);
 
     /* VLAN settings */
@@ -732,6 +800,25 @@ _serialize_yaml(
         if (def->vlan_link)
             YAML_STRING(def, event, emitter, "link", def->vlan_link->id);
     }
+
+    /* VXLAN settings */
+    if (def->type == NETPLAN_DEF_TYPE_VXLAN) {
+        YAML_UINT_DEFAULT(def, event, emitter, "vni", def->vxlan_vni, G_MAXUINT);
+        YAML_BOOL_FALSE(def, event, emitter, "neigh-suppress", def->neigh_suppress);
+    }
+
+    /* VXLAN options */
+    if (def->vxlans) {
+        YAML_SCALAR_PLAIN(event, emitter, "vxlans");
+        YAML_SEQUENCE_OPEN(event, emitter);
+        for (unsigned i = 0; i < def->vxlans->len; ++i)
+            YAML_SCALAR_PLAIN(event, emitter, g_array_index(def->vxlans, char*, i));
+        YAML_SEQUENCE_CLOSE(event, emitter);
+    }
+
+    /* VRF settings */
+    if (def->type == NETPLAN_DEF_TYPE_VRF)
+        YAML_UINT_DEFAULT(def, event, emitter, "table", def->vrf_table, G_MAXUINT);
 
     /* Tunnel settings */
     if (def->type == NETPLAN_DEF_TYPE_TUNNEL) {

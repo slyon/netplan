@@ -1994,6 +1994,25 @@ handle_bond_primary_slave(NetplanParser* npp, yaml_node_t* node, const void* dat
     return TRUE;
 }
 
+static gboolean
+handle_vxlans(NetplanParser* npp, yaml_node_t* node, const void* _, GError** error)
+{
+    for (yaml_node_item_t *i = node->data.sequence.items.start; i < node->data.sequence.items.top; i++) {
+        yaml_node_t *entry = yaml_document_get_node(&npp->doc, *i);
+        assert_type(npp, entry, YAML_SCALAR_NODE);
+
+        if (!npp->current.netdef->vxlans) {
+            npp->current.netdef->vxlans = g_array_new(FALSE, FALSE, sizeof(char*));
+            break;
+        }
+        char* s = g_strdup(scalar(entry));
+        g_array_append_val(npp->current.netdef->vxlans, s);
+    }
+
+    mark_data_as_dirty(npp, &npp->current.netdef->vxlans);
+    return TRUE;
+}
+
 static const mapping_entry_handler bond_params_handlers[] = {
     {"mode", YAML_SCALAR_NODE, {.generic=handle_bond_mode}, netdef_offset(bond_params.mode)},
     {"lacp-rate", YAML_SCALAR_NODE, {.generic=handle_netdef_str}, netdef_offset(bond_params.lacp_rate)},
@@ -2023,9 +2042,84 @@ static const mapping_entry_handler bond_params_handlers[] = {
 };
 
 static gboolean
+handle_vrf_interfaces(NetplanParser* npp, yaml_node_t* node, const void* data, GError** error)
+{
+    /* all entries must refer to already defined IDs */
+    for (yaml_node_item_t *i = node->data.sequence.items.start; i < node->data.sequence.items.top; i++) {
+        yaml_node_t *entry = yaml_document_get_node(&npp->doc, *i);
+        NetplanNetDefinition *component;
+
+        assert_type(npp, entry, YAML_SCALAR_NODE);
+        component = g_hash_table_lookup(npp->parsed_defs, scalar(entry));
+        if (!component) {
+            add_missing_node(npp, entry);
+        } else {
+            if (component->vrf && g_strcmp0(component->vrf, npp->current.netdef->id) != 0)
+                return yaml_error(npp, node, error, "%s: interface '%s' is already assigned to vrf %s",
+                                  npp->current.netdef->id, scalar(entry), component->vrf);
+            set_str_if_null(component->vrf, npp->current.netdef->id);
+        }
+    }
+
+    return TRUE;
+}
+
+static gboolean
+handle_vxlan_source_port(NetplanParser* npp, yaml_node_t* node, const void* data, GError** error)
+{
+    for (yaml_node_item_t *i = node->data.sequence.items.start; i < node->data.sequence.items.top; i++) {
+        yaml_node_t *entry = yaml_document_get_node(&npp->doc, *i);
+        assert_type(npp, entry, YAML_SCALAR_NODE);
+
+        if (!npp->current.netdef->vxlan_params.source_port_range) {
+            npp->current.netdef->vxlan_params.source_port_range = g_array_new(FALSE, FALSE, sizeof(char *));
+            break;
+        }
+        char* s = g_strdup(scalar(entry));
+        g_array_append_val(npp->current.netdef->vxlan_params.source_port_range, s);
+    }
+
+    mark_data_as_dirty(npp, &npp->current.netdef->vxlan_params.source_port_range);
+    return TRUE;
+}
+
+static gboolean
 handle_bonding(NetplanParser* npp, yaml_node_t* node, const char* key_prefix, const void* _, GError** error)
 {
     return process_mapping(npp, node, key_prefix, bond_params_handlers, NULL, error);
+}
+
+static const mapping_entry_handler vxlan_params_handlers[] = {
+    {"remote", YAML_SCALAR_NODE, {.generic=handle_netdef_ip4}, netdef_offset(vxlan_params.remote)},
+    {"local", YAML_SCALAR_NODE, {.generic=handle_netdef_ip4}, netdef_offset(vxlan_params.local)},
+    {"group", YAML_SCALAR_NODE, {.generic=handle_netdef_ip4}, netdef_offset(vxlan_params.group)},
+    {"tos", YAML_SCALAR_NODE, {.generic=handle_netdef_guint}, netdef_offset(vxlan_params.tos)},
+    {"ttl", YAML_SCALAR_NODE, {.generic=handle_netdef_guint}, netdef_offset(vxlan_params.ttl)},
+    {"mac-learning", YAML_SCALAR_NODE, {.generic=handle_netdef_bool}, netdef_offset(vxlan_params.mac_learning)},
+    {"fdb-ageing", YAML_SCALAR_NODE, {.generic=handle_netdef_guint}, netdef_offset(vxlan_params.fdb_ageing)},
+    {"max-fdb-entries", YAML_SCALAR_NODE, {.generic=handle_netdef_guint}, netdef_offset(vxlan_params.max_fdb_entries)},
+    {"reduce-arp-proxy", YAML_SCALAR_NODE, {.generic=handle_netdef_bool}, netdef_offset(vxlan_params.reduce_arp_proxy)},
+    {"l2-miss-notification", YAML_SCALAR_NODE, {.generic=handle_netdef_bool}, netdef_offset(vxlan_params.l2_miss_notification)},
+    {"l3-miss-notification", YAML_SCALAR_NODE, {.generic=handle_netdef_bool}, netdef_offset(vxlan_params.l3_miss_notification)},
+    {"route-short-circuit", YAML_SCALAR_NODE, {.generic=handle_netdef_bool}, netdef_offset(vxlan_params.route_short_circuit)},
+    {"udp-checksum", YAML_SCALAR_NODE, {.generic=handle_netdef_bool}, netdef_offset(vxlan_params.udp_checksum)},
+    {"udp6-zero-checksum-tx", YAML_SCALAR_NODE, {.generic=handle_netdef_bool}, netdef_offset(vxlan_params.udp6_zero_checksum_tx)},
+    {"udp6-zero-checksum-rx", YAML_SCALAR_NODE, {.generic=handle_netdef_bool}, netdef_offset(vxlan_params.udp6_zero_checksum_rx)},
+    {"remote-checksum-tx", YAML_SCALAR_NODE, {.generic=handle_netdef_bool}, netdef_offset(vxlan_params.remote_checksum_tx)},
+    {"remote-checksum-rx", YAML_SCALAR_NODE, {.generic=handle_netdef_bool}, netdef_offset(vxlan_params.remote_checksum_rx)},
+    {"group-policy-extension", YAML_SCALAR_NODE, {.generic=handle_netdef_bool}, netdef_offset(vxlan_params.group_policy_extension)},
+    {"generic-protocol-extension", YAML_SCALAR_NODE, {.generic=handle_netdef_bool}, netdef_offset(vxlan_params.generic_protocol_extension)},
+    {"destination-port", YAML_SCALAR_NODE, {.generic=handle_netdef_guint}, netdef_offset(vxlan_params.destination_port)},
+    {"source-port-range", YAML_SEQUENCE_NODE, {.generic=handle_vxlan_source_port}, netdef_offset(vxlan_params.source_port_range)},
+    {"flow-label", YAML_SCALAR_NODE, {.generic=handle_netdef_guint}, netdef_offset(vxlan_params.flow_label)},
+    {"ip-do-not-fragment", YAML_SCALAR_NODE, {.generic=handle_netdef_bool}, netdef_offset(vxlan_params.ip_do_not_fragment)},
+    {NULL}
+};
+
+static gboolean
+handle_vxlan_params(NetplanParser* npp, yaml_node_t* node, const char* key_prefix, const void* _, GError** error)
+{
+    return process_mapping(npp, node, key_prefix, vxlan_params_handlers, NULL, error);
 }
 
 static gboolean
@@ -2478,7 +2572,8 @@ static const mapping_entry_handler dhcp6_overrides_handlers[] = {
     {"optional-addresses", YAML_SEQUENCE_NODE, {.generic=handle_optional_addresses}}, \
     {"renderer", YAML_SCALAR_NODE, {.generic=handle_netdef_renderer}}, \
     {"routes", YAML_SEQUENCE_NODE, {.generic=handle_routes}}, \
-    {"routing-policy", YAML_SEQUENCE_NODE, {.generic=handle_ip_rules}}
+    {"routing-policy", YAML_SEQUENCE_NODE, {.generic=handle_ip_rules}}, \
+    {"vxlans", YAML_SEQUENCE_NODE, {.generic=handle_vxlans}}
 
 #define COMMON_BACKEND_HANDLERS \
     {"networkmanager", YAML_MAPPING_NODE, {.map={.handlers=nm_backend_settings_handlers}}}, \
@@ -2498,6 +2593,10 @@ static const mapping_entry_handler dhcp6_overrides_handlers[] = {
     {"generic-segmentation-offload", YAML_SCALAR_NODE, {.generic=handle_netdef_tristate}, netdef_offset(generic_segmentation_offload)}, \
     {"generic-receive-offload", YAML_SCALAR_NODE, {.generic=handle_netdef_tristate}, netdef_offset(generic_receive_offload)}, \
     {"large-receive-offload", YAML_SCALAR_NODE, {.generic=handle_netdef_tristate}, netdef_offset(large_receive_offload)}
+
+/* Handlers for VXLANs */
+#define VXLAN_LINK_HANDLERS \
+    {"neigh-suppress", YAML_SCALAR_NODE, {.generic=handle_netdef_bool}, netdef_offset(neigh_suppress)}
 
 static const mapping_entry_handler ethernet_def_handlers[] = {
     COMMON_LINK_HANDLERS,
@@ -2543,6 +2642,23 @@ static const mapping_entry_handler vlan_def_handlers[] = {
     COMMON_BACKEND_HANDLERS,
     {"id", YAML_SCALAR_NODE, {.generic=handle_netdef_guint}, netdef_offset(vlan_id)},
     {"link", YAML_SCALAR_NODE, {.generic=handle_netdef_id_ref}, netdef_offset(vlan_link)},
+    {NULL}
+};
+
+static const mapping_entry_handler vxlan_def_handlers[] = {
+    COMMON_LINK_HANDLERS,
+    COMMON_BACKEND_HANDLERS,
+    VXLAN_LINK_HANDLERS,
+    {"vni", YAML_SCALAR_NODE, {.generic=handle_netdef_guint}, netdef_offset(vxlan_vni)},
+    {"parameters", YAML_MAPPING_NODE, {.map={.custom=handle_vxlan_params}}},
+    {NULL}
+};
+
+static const mapping_entry_handler vrf_def_handlers[] = {
+    COMMON_LINK_HANDLERS,
+    COMMON_BACKEND_HANDLERS,
+    {"interfaces", YAML_SEQUENCE_NODE, {.generic=handle_vrf_interfaces}, NULL},
+    {"table", YAML_SCALAR_NODE, {.generic=handle_netdef_guint}, netdef_offset(vrf_table)},
     {NULL}
 };
 
@@ -2763,6 +2879,8 @@ handle_network_type(NetplanParser* npp, yaml_node_t* node, const char* key_prefi
             case NETPLAN_DEF_TYPE_MODEM: handlers = modem_def_handlers; break;
             case NETPLAN_DEF_TYPE_TUNNEL: handlers = tunnel_def_handlers; break;
             case NETPLAN_DEF_TYPE_VLAN: handlers = vlan_def_handlers; break;
+            case NETPLAN_DEF_TYPE_VXLAN: handlers = vxlan_def_handlers; break;
+            case NETPLAN_DEF_TYPE_VRF: handlers = vrf_def_handlers; break;
             case NETPLAN_DEF_TYPE_WIFI: handlers = wifi_def_handlers; break;
             case NETPLAN_DEF_TYPE_NM:
                 g_warning("netplan: %s: handling NetworkManager passthrough device, settings are not fully supported.", npp->current.netdef->id);
@@ -2822,6 +2940,8 @@ static const mapping_entry_handler network_handlers[] = {
     {"tunnels", YAML_MAPPING_NODE, {.map={.custom=handle_network_type}}, GUINT_TO_POINTER(NETPLAN_DEF_TYPE_TUNNEL)},
     {"version", YAML_SCALAR_NODE, {.generic=handle_network_version}},
     {"vlans", YAML_MAPPING_NODE, {.map={.custom=handle_network_type}}, GUINT_TO_POINTER(NETPLAN_DEF_TYPE_VLAN)},
+    {"vxlans", YAML_MAPPING_NODE, {.map={.custom=handle_network_type}}, GUINT_TO_POINTER(NETPLAN_DEF_TYPE_VXLAN)},
+    {"vrfs", YAML_MAPPING_NODE, {.map={.custom=handle_network_type}}, GUINT_TO_POINTER(NETPLAN_DEF_TYPE_VRF)},
     {"wifis", YAML_MAPPING_NODE, {.map={.custom=handle_network_type}}, GUINT_TO_POINTER(NETPLAN_DEF_TYPE_WIFI)},
     {"modems", YAML_MAPPING_NODE, {.map={.custom=handle_network_type}}, GUINT_TO_POINTER(NETPLAN_DEF_TYPE_MODEM)},
     {"nm-devices", YAML_MAPPING_NODE, {.map={.custom=handle_network_type}}, GUINT_TO_POINTER(NETPLAN_DEF_TYPE_NM)},
