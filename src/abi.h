@@ -329,6 +329,7 @@ struct netplan_net_definition {
     gboolean sriov_delay_virtual_functions_rebind;
 
     /* vrf */
+    /* netplan-feature: vrf */
     char* vrf;
     guint vrf_table;
     NetplanNetDefinition* vrf_link;
