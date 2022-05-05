@@ -324,7 +324,6 @@ reset_netdef(NetplanNetDefinition* netdef, NetplanDefType new_type, NetplanBacke
     netdef->vxlan_params.flow_label = 0;
     netdef->vxlan_params.ip_do_not_fragment = FALSE;
     netdef->vxlan_params.independent = FALSE;
-    netdef->vxlan_bridge = NULL;
     netdef->vrf = NULL;
     netdef->neigh_suppress = FALSE;
     free_garray_with_destructor(&netdef->vxlans, g_free);

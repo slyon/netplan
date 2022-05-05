@@ -106,10 +106,10 @@ class TestConfigManager(unittest.TestCase):
       link: eth99
   bridges:
     br3:
-      interfaces: [ ethbr1 ]
+      interfaces: [ ethbr1, vxlan1005 ]
       vrf: vrf1005
     br4:
-      interfaces: [ ethbr2 ]
+      interfaces: [ ethbr2, vxlan1 ]
       vrf: vrf1005
       parameters:
         stp: on
@@ -118,7 +118,6 @@ class TestConfigManager(unittest.TestCase):
       vni: 1005
       mtu: 8950
       accept-ra: no
-      bridge: br3
       neigh-suppress: true
       parameters:
         mac-learning: false
@@ -128,7 +127,6 @@ class TestConfigManager(unittest.TestCase):
       vni: 1
       mtu: 8950
       accept-ra: no
-      bridge: br4
       neigh-suppress: true
       parameters:
         mac-learning: false

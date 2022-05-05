@@ -890,9 +890,6 @@ netplan_netdef_write_network_file(
             g_string_append_printf(network, "Hostname=%s\n", combined_dhcp_overrides.hostname);
     }
 
-    if (def->vxlan_bridge)
-        g_string_append_printf(network, "Bridge=%s\n", def->vxlan_bridge);
-
     /* VXLAN options */
     if (def->vxlans)
         for (unsigned i = 0; i < def->vxlans->len; ++i)

@@ -338,7 +338,6 @@ struct netplan_net_definition {
     /* netplan-feature: vxlan */
     guint vxlan_vni;
     NetplanNetDefinition* vxlan_link;
-    char* vxlan_bridge;
     GArray* vxlans;
     gboolean neigh_suppress;
 

@@ -26,9 +26,12 @@ class TestNetworkd(TestBase):
     def test_vxlan_set_bridge(self):
         self.generate('''network:
   version: 2
+  bridges:
+    br1005:
+      interfaces:
+        - vxlan1005
   vxlans:
     vxlan1005:
-      bridge: br1005
       neigh-suppress: false
       vni: 1005''')
         self.assert_networkd({

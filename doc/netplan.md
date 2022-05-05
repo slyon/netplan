@@ -1397,10 +1397,6 @@ Example:
 :    The VXLAN Network Identifier (or VXLAN Segment ID).
      Takes a number in the range 1…16777215.
 
-``bridge`` (scalar)
-
-:    The name of the bridge interface to add the link to.
-
 ``parameters`` (mapping)
 
 :    Customization parameters for special vxlan options.

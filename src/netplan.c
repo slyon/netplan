@@ -807,7 +807,6 @@ _serialize_yaml(
     /* VXLAN settings */
     if (def->type == NETPLAN_DEF_TYPE_VXLAN) {
         YAML_UINT_DEFAULT(def, event, emitter, "vni", def->vxlan_vni, G_MAXUINT);
-        YAML_STRING(def, event, emitter, "bridge", def->vxlan_bridge);
         YAML_BOOL_FALSE(def, event, emitter, "neigh-suppress", def->neigh_suppress);
     }
 

@@ -380,7 +380,7 @@
       </data-member>
     </class-decl>
     <typedef-decl name='NetplanBackendSettings' type-id='type-id-66' filepath='src/abi.h' line='150' column='1' id='type-id-65'/>
-    <class-decl name='netplan_net_definition' size-in-bits='10304' is-struct='yes' visibility='default' filepath='src/abi.h' line='155' column='1' id='type-id-16'>
+    <class-decl name='netplan_net_definition' size-in-bits='10240' is-struct='yes' visibility='default' filepath='src/abi.h' line='155' column='1' id='type-id-16'>
       <data-member access='public' layout-offset-in-bits='0'>
         <var-decl name='type' type-id='type-id-5' visibility='default' filepath='src/abi.h' line='156' column='1'/>
       </data-member>
@@ -607,16 +607,13 @@
         <var-decl name='vxlan_link' type-id='type-id-71' visibility='default' filepath='src/abi.h' line='340' column='1'/>
       </data-member>
       <data-member access='public' layout-offset-in-bits='9152'>
-        <var-decl name='vxlan_bridge' type-id='type-id-45' visibility='default' filepath='src/abi.h' line='341' column='1'/>
+        <var-decl name='vxlans' type-id='type-id-60' visibility='default' filepath='src/abi.h' line='341' column='1'/>
       </data-member>
       <data-member access='public' layout-offset-in-bits='9216'>
-        <var-decl name='vxlans' type-id='type-id-60' visibility='default' filepath='src/abi.h' line='342' column='1'/>
+        <var-decl name='neigh_suppress' type-id='type-id-39' visibility='default' filepath='src/abi.h' line='342' column='1'/>
       </data-member>
       <data-member access='public' layout-offset-in-bits='9280'>
-        <var-decl name='neigh_suppress' type-id='type-id-39' visibility='default' filepath='src/abi.h' line='343' column='1'/>
-      </data-member>
-      <data-member access='public' layout-offset-in-bits='9344'>
-        <var-decl name='vxlan_params' type-id='type-id-180' visibility='default' filepath='src/abi.h' line='370' column='1'/>
+        <var-decl name='vxlan_params' type-id='type-id-180' visibility='default' filepath='src/abi.h' line='369' column='1'/>
       </data-member>
     </class-decl>
     <class-decl name='__anonymous_struct__' size-in-bits='64' is-struct='yes' is-anonymous='yes' visibility='default' filepath='src/abi.h' line='188' column='1' id='type-id-70'>
