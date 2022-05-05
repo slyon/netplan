@@ -5,9 +5,8 @@ network:
       addresses:
         - 192.168.10.10/32
       vxlans:
-        names:
-          - vxlan1
-          - vxlan1005
+        - vxlan1
+        - vxlan1005
   vrfs:
     vrf1005:
       table: 1005

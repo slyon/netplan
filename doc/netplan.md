@@ -524,10 +524,9 @@ similar to ``gateway*``, and ``search:`` is a list of search domains.
 
 :   VRF interface to add the link to.
 
-``vxlans`` (scalar)
+``vxlans`` (sequence of scalars)
 
-    ``names`` (sequence of scalars)
-    :   The names of VXLANs be created on the link.
+:   The VXLAN interfaces be created on the link.
 
 ``neigh-suppress`` (scalar)
 
@@ -1418,7 +1417,7 @@ Example:
      ``tos`` (scalar)
      :    The Type Of Service byte value for a vxlan interface.
 
-     ``ttl`` (scalar)
+     ``ttl`` (scalar) – since **0.105**
      :    A fixed Time To Live N on Virtual eXtensible Local Area Network packets.
           Takes a number in the range 0…255.
 

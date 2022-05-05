@@ -328,17 +328,18 @@ struct netplan_net_definition {
     char* embedded_switch_mode;
     gboolean sriov_delay_virtual_functions_rebind;
 
+    /* vrf */
+    char* vrf;
+    guint vrf_table;
+    NetplanNetDefinition* vrf_link;
+
     /* vxlan */
+    /* netplan-feature: vxlan */
     guint vxlan_vni;
     NetplanNetDefinition* vxlan_link;
     char* vxlan_bridge;
     GArray* vxlans;
     gboolean neigh_suppress;
-
-    /* vrf */
-    char* vrf;
-    guint vrf_table;
-    NetplanNetDefinition* vrf_link;
 
     struct {
         char* remote;
