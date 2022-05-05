@@ -74,8 +74,12 @@ class TestConfigManager(unittest.TestCase):
   vrfs:
     vrf1005:
       table: 1005
+      interfaces:
+        - br3
+        - br4
     vrf1006:
       table: 1006
+      interfaces: []
   ethernets:
     lo:
       addresses: [ 192.168.10.10/32 ]
@@ -107,10 +111,8 @@ class TestConfigManager(unittest.TestCase):
   bridges:
     br3:
       interfaces: [ ethbr1, vxlan1005 ]
-      vrf: vrf1005
     br4:
       interfaces: [ ethbr2, vxlan1 ]
-      vrf: vrf1005
       parameters:
         stp: on
   vxlans:

@@ -72,7 +72,7 @@ Physical devices
 
 Virtual devices
 
-:  (Examples: veth, bridge, bond) These are fully under the control of the
+:  (Examples: veth, bridge, bond, vrf) These are fully under the control of the
    config file(s) and the network stack. I. e. these devices are being created
    instead of matched. Thus ``match:`` and ``set-name:`` are not applicable for
    these, and the ID field is the name of the created virtual device.
@@ -519,10 +519,6 @@ similar to ``gateway*``, and ``search:`` is a list of search domains.
 ``routing-policy`` (sequence of mappings)
 
 :   Configure policy routing for the device; see the ``Routing`` section below.
-
-``vrf`` (scalar)
-
-:   VRF interface to add the link to.
 
 ``vxlans`` (sequence of scalars)
 
@@ -1468,10 +1464,10 @@ Example:
      :    Configures the default destination UDP port. If the destination port is not specified
           then Linux kernel default will be used. Set to 4789 to get the IANA assigned value.
 
-     ``port-range`` (scalar)
+     ``source-port-range`` (sequence of scalars)
      :    Configures the source port range for the VXLAN. The kernel assigns the source UDP port
           based on the flow to help the receiver to do load balancing. When this option is not set,
-          the normal range of local UDP ports is used.
+          the normal range of local UDP ports is used. Uses the form [LOWER, UPPER].
 
      ``flow-label`` (scalar)
      :    Specifies the flow label to use in outgoing packets. The valid range is 0-1048575.
@@ -1480,16 +1476,28 @@ Example:
      :    Allows setting the IPv4 Do not Fragment (DF) bit in outgoing packets. Takes a boolean value.
           When unset, the kernel's default will be used.
 
-     ``independent`` (scalar)
-     :    Takes a boolean. When true, the vxlan interface is created without any underlying network interface.
-          Defaults to false, which means that a .network file that requests this VXLAN interface using VXLAN=
-          is required for the VXLAN to be created.
-
 ## Properties for device type ``vrfs:``
 
 ``table`` (scalar)
 
 :    The numeric routing table identifier. This setting is compulsory.
+
+``interfaces`` (sequence of scalars)
+
+:    All devices matching this ID list will be added to the vrf. This may
+     be an empty list, in which case the vrf will be brought online with
+     no member interfaces.
+
+     Example:
+
+          vrfs:
+            vrf20:
+              table: 20
+              interfaces: [ br0 ]
+          [...]
+          bridges:
+            br0:
+              interfaces: []
 
 ## Properties for device type ``nm-devices:``
 
@@ -1567,7 +1575,18 @@ This is a complex example which shows most available features:
       # if specified, can only realistically have that value, as networkd cannot
       # render wifi/3G.
       renderer: NetworkManager
+      vrfs:
+        mgmt-vrf:
+          table: 10
+          interfaces:
+            - id1
       ethernets:
+        lo:
+          addresses:
+            - 172.16.20.20/32
+          link-local: []
+          vxlans:
+            - vxlan20
         # opaque ID for physical interfaces, only referred to by other stanzas
         id0:
           match:
@@ -1600,6 +1619,22 @@ This is a complex example which shows most available features:
               from: 192.168.14.3/24
               table: 70
               priority: 50
+        id1:
+          match:
+            macaddress: 00:11:22:33:44:56
+          wakeonlan: true
+          dhcp4: true
+          addresses:
+            - 192.168.24.2/24
+          nameservers:
+            search: [foo.local, bar.local]
+            addresses: [8.8.8.8]
+          routes:
+            - to: 0.0.0.0/0
+              via: 192.168.24.254
+              table: 10
+              on-link: true
+              metric: 100
           # only networkd can render on-link routes and routing policies
           renderer: networkd
         lom:
@@ -1638,6 +1673,19 @@ This is a complex example which shows most available features:
           # IDs of the components; switchports expands into multiple interfaces
           interfaces: [wlp1s0, switchports]
           dhcp4: true
+        br20:
+          interfaces: [vxlan20]
+      vxlans:
+        vxlan20:
+          vni: 20
+          mtu: 8950
+          accept-ra: no
+          neigh-suppress: true
+          link-local: []
+          parameters:
+            mac-learning: false
+            destination-port: 4789
+            local: 172.16.20.20
 
 <!--- vim: ft=markdown
 -->

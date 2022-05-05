@@ -10,15 +10,16 @@ network:
   vrfs:
     vrf1005:
       table: 1005
+      interfaces:
+        - br1
+        - br1005
   bridges:
     br1:
       interfaces:
         - vxlan1
-      vrf: vrf1005
     br1005:
       interfaces:
         - vxlan1005
-      vrf: vrf1005
   vxlans:
     vxlan1005:
       vni: 1005

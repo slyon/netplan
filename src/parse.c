@@ -1948,8 +1948,10 @@ handle_vxlans(NetplanParser* npp, yaml_node_t* node, const void* _, GError** err
         yaml_node_t *entry = yaml_document_get_node(&npp->doc, *i);
         assert_type(npp, entry, YAML_SCALAR_NODE);
 
-        if (!npp->current.netdef->vxlans)
+        if (!npp->current.netdef->vxlans) {
             npp->current.netdef->vxlans = g_array_new(FALSE, FALSE, sizeof(char*));
+            break;
+        }
         char* s = g_strdup(scalar(entry));
         g_array_append_val(npp->current.netdef->vxlans, s);
     }
@@ -1987,6 +1989,48 @@ static const mapping_entry_handler bond_params_handlers[] = {
 };
 
 static gboolean
+handle_vrf_interfaces(NetplanParser* npp, yaml_node_t* node, const void* data, GError** error)
+{
+    /* all entries must refer to already defined IDs */
+    for (yaml_node_item_t *i = node->data.sequence.items.start; i < node->data.sequence.items.top; i++) {
+        yaml_node_t *entry = yaml_document_get_node(&npp->doc, *i);
+        NetplanNetDefinition *component;
+
+        assert_type(npp, entry, YAML_SCALAR_NODE);
+        component = g_hash_table_lookup(npp->parsed_defs, scalar(entry));
+        if (!component) {
+            add_missing_node(npp, entry);
+        } else {
+            if (component->vrf && g_strcmp0(component->vrf, npp->current.netdef->id) != 0)
+                return yaml_error(npp, node, error, "%s: interface '%s' is already assigned to vrf %s",
+                                  npp->current.netdef->id, scalar(entry), component->vrf);
+            set_str_if_null(component->vrf, npp->current.netdef->id);
+        }
+    }
+
+    return TRUE;
+}
+
+static gboolean
+handle_vxlan_source_port(NetplanParser* npp, yaml_node_t* node, const void* data, GError** error)
+{
+    for (yaml_node_item_t *i = node->data.sequence.items.start; i < node->data.sequence.items.top; i++) {
+        yaml_node_t *entry = yaml_document_get_node(&npp->doc, *i);
+        assert_type(npp, entry, YAML_SCALAR_NODE);
+
+        if (!npp->current.netdef->vxlan_params.source_port_range) {
+            npp->current.netdef->vxlan_params.source_port_range = g_array_new(FALSE, FALSE, sizeof(char *));
+            break;
+        }
+        char* s = g_strdup(scalar(entry));
+        g_array_append_val(npp->current.netdef->vxlan_params.source_port_range, s);
+    }
+
+    mark_data_as_dirty(npp, &npp->current.netdef->vxlan_params.source_port_range);
+    return TRUE;
+}
+
+static gboolean
 handle_bonding(NetplanParser* npp, yaml_node_t* node, const char* key_prefix, const void* _, GError** error)
 {
     return process_mapping(npp, node, key_prefix, bond_params_handlers, NULL, error);
@@ -2013,10 +2057,9 @@ static const mapping_entry_handler vxlan_params_handlers[] = {
     {"group-policy-extension", YAML_SCALAR_NODE, {.generic=handle_netdef_bool}, netdef_offset(vxlan_params.group_policy_extension)},
     {"generic-protocol-extension", YAML_SCALAR_NODE, {.generic=handle_netdef_bool}, netdef_offset(vxlan_params.generic_protocol_extension)},
     {"destination-port", YAML_SCALAR_NODE, {.generic=handle_netdef_guint}, netdef_offset(vxlan_params.destination_port)},
-    {"port-range", YAML_SCALAR_NODE, {.generic=handle_netdef_str}, netdef_offset(vxlan_params.port_range)},
+    {"source-port-range", YAML_SEQUENCE_NODE, {.generic=handle_vxlan_source_port}, netdef_offset(vxlan_params.source_port_range)},
     {"flow-label", YAML_SCALAR_NODE, {.generic=handle_netdef_guint}, netdef_offset(vxlan_params.flow_label)},
     {"ip-do-not-fragment", YAML_SCALAR_NODE, {.generic=handle_netdef_bool}, netdef_offset(vxlan_params.ip_do_not_fragment)},
-    {"independent", YAML_SCALAR_NODE, {.generic=handle_netdef_bool}, netdef_offset(vxlan_params.independent)},
     {NULL}
 };
 
@@ -2477,8 +2520,7 @@ static const mapping_entry_handler dhcp6_overrides_handlers[] = {
     {"renderer", YAML_SCALAR_NODE, {.generic=handle_netdef_renderer}}, \
     {"routes", YAML_SEQUENCE_NODE, {.generic=handle_routes}}, \
     {"routing-policy", YAML_SEQUENCE_NODE, {.generic=handle_ip_rules}}, \
-    {"vxlans", YAML_SEQUENCE_NODE, {.generic=handle_vxlans}}, \
-    {"vrf", YAML_SCALAR_NODE, {.generic=handle_netdef_str}, netdef_offset(vrf)}
+    {"vxlans", YAML_SEQUENCE_NODE, {.generic=handle_vxlans}}
 
 #define COMMON_BACKEND_HANDLERS \
     {"networkmanager", YAML_MAPPING_NODE, {.map={.handlers=nm_backend_settings_handlers}}}, \
@@ -2560,6 +2602,7 @@ static const mapping_entry_handler vxlan_def_handlers[] = {
 static const mapping_entry_handler vrf_def_handlers[] = {
     COMMON_LINK_HANDLERS,
     COMMON_BACKEND_HANDLERS,
+    {"interfaces", YAML_SEQUENCE_NODE, {.generic=handle_vrf_interfaces}, NULL},
     {"table", YAML_SCALAR_NODE, {.generic=handle_netdef_guint}, netdef_offset(vrf_table)},
     {NULL}
 };

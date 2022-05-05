@@ -332,12 +332,10 @@ struct netplan_net_definition {
     /* netplan-feature: vrf */
     char* vrf;
     guint vrf_table;
-    NetplanNetDefinition* vrf_link;
 
     /* vxlan */
     /* netplan-feature: vxlan */
     guint vxlan_vni;
-    NetplanNetDefinition* vxlan_link;
     GArray* vxlans;
     gboolean neigh_suppress;
 
@@ -362,9 +360,8 @@ struct netplan_net_definition {
         gboolean group_policy_extension;
         gboolean generic_protocol_extension;
         guint destination_port;
-        char* port_range;
+        GArray* source_port_range;
         guint flow_label;
         gboolean ip_do_not_fragment;
-        gboolean independent;
     } vxlan_params;
 };

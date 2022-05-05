@@ -52,9 +52,17 @@ UseMTU=true
     def test_bridge_set_vrf(self):
         self.generate('''network:
   version: 2
+  ethernets:
+    eno1:
+      addresses: [ 192.168.0.10/24 ]
   bridges:
     br0:
-      vrf: vrf1005''')
+      interfaces: [ eno1 ]
+  vrfs:
+    vrf1005:
+      table: 1005
+      interfaces:
+      - br0''')
 
         self.assert_networkd({'br0.network': '''[Match]
 Name=br0
@@ -67,6 +75,28 @@ ConfigureWithoutCarrier=yes
                               'br0.netdev': '''[NetDev]
 Name=br0
 Kind=bridge
+''',
+                              'vrf1005.network': '''[Match]
+Name=vrf1005
+
+[Network]
+LinkLocalAddressing=ipv6
+ConfigureWithoutCarrier=yes
+''',
+                              'vrf1005.netdev': '''[NetDev]
+Name=vrf1005
+Kind=vrf
+
+[VRF]
+Table=1005
+''',
+                              'eno1.network': '''[Match]
+Name=eno1
+
+[Network]
+LinkLocalAddressing=no
+Address=192.168.0.10/24
+Bridge=br0
 '''})
 
     def test_bridge_dhcp6_no_accept_ra(self):

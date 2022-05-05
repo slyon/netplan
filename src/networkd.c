@@ -430,14 +430,20 @@ write_vxlan_parameters(const NetplanNetDefinition* def, GString* s)
         g_string_append_printf(params, "\nGenericProtocolExtension=%s", def->vxlan_params.generic_protocol_extension ? "True" : "False");
     if (def->vxlan_params.destination_port)
         g_string_append_printf(params, "\nDestinationPort=%d", def->vxlan_params.destination_port);
-    if (def->vxlan_params.port_range)
-        g_string_append_printf(params, "\nPortRange=%s", def->vxlan_params.port_range);
+    if (def->vxlan_params.source_port_range) {
+        g_string_append_printf(params, "\nPortRange=");
+        for (unsigned i = 0; i < def->vxlan_params.source_port_range->len; ++i) {
+            g_string_append_printf(params, "%s", g_array_index(def->vxlan_params.source_port_range, char*, i));
+            if (i == 0)
+                g_string_append_printf(params, "-");
+            else if (i > 0)
+                break;
+        }
+    }
     if (def->vxlan_params.flow_label)
         g_string_append_printf(params, "\nFlowLabel=%d", def->vxlan_params.flow_label);
     if (def->vxlan_params.ip_do_not_fragment)
         g_string_append_printf(params, "\nIPDoNotFragment=%s", def->vxlan_params.ip_do_not_fragment ? "True" : "False");
-    if (def->vxlan_params.independent)
-        g_string_append_printf(params, "\nIndependent=%s", def->vxlan_params.independent ? "True" : "False");
 
     if (params->len)
         g_string_append_printf(s, "%s\n", params->str);
@@ -891,9 +897,10 @@ netplan_netdef_write_network_file(
     }
 
     /* VXLAN options */
-    if (def->vxlans)
+    if (def->vxlans) {
         for (unsigned i = 0; i < def->vxlans->len; ++i)
             g_string_append_printf(network, "VXLAN=%s\n", g_array_index(def->vxlans, char*, i));
+    }
 
     if (def->neigh_suppress) {
         g_string_append_printf(network, "\n[Bridge]\n");
