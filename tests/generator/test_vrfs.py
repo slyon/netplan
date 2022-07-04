@@ -63,7 +63,23 @@ class TestNetplanYAMLv2(TestBase):
 class TestConfigErrors(TestBase):
 
     def test_vrf_missing_table(self):
-        self.generate('''network:
+        err = self.generate('''network:
   version: 2
   vrfs:
-    vrf1005:''', expect_fail=True)
+    vrf1005: {}''', expect_fail=True)
+
+        self.assertIn("vrf1005: missing 'table' property", err)
+
+    def test_vrf_already_assigned(self):
+        err = self.generate('''network:
+  version: 2
+  vrfs:
+    vrf0:
+      table: 42
+      interfaces: [eno1]
+    vrf1:
+      table: 43
+      interfaces: [eno1]
+  ethernets:
+    eno1: {}''', expect_fail=True)
+        self.assertIn("vrf1: interface 'eno1' is already assigned to vrf vrf0", err)
