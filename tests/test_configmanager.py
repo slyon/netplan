@@ -82,9 +82,6 @@ class TestConfigManager(unittest.TestCase):
     other-config:
       disable-in-band: true
   ethernets:
-    lo:
-      addresses: [ 192.168.10.10/32 ]
-      vxlans: [ vxlan1, vxlan1005 ]
     eth0:
       dhcp4: false
     ethbr1:
@@ -109,30 +106,11 @@ class TestConfigManager(unittest.TestCase):
     vlan2:
       id: 2
       link: eth0
-  vxlans:
-    vxlan1005:
-      vni: 1005
-      mtu: 8950
-      accept-ra: no
-      neigh-suppress: true
-      parameters:
-        mac-learning: false
-        destination-port: 4789
-        local: 192.168.10.10
-    vxlan1:
-      vni: 1
-      mtu: 8950
-      accept-ra: no
-      neigh-suppress: true
-      parameters:
-        mac-learning: false
-        destination-port: 4789
-        local: 192.168.10.10
   bridges:
     br3:
-      interfaces: [ ethbr1, vxlan1005 ]
+      interfaces: [ ethbr1 ]
     br4:
-      interfaces: [ ethbr2, vxlan1 ]
+      interfaces: [ ethbr2 ]
       parameters:
         stp: on
   vrfs:
@@ -177,7 +155,6 @@ class TestConfigManager(unittest.TestCase):
         self.configmanager.parse()
         state = self.configmanager.np_state
         assert state
-        self.assertIn('lo',     self.configmanager.ethernets)
         self.assertIn('eth0',   state.ethernets)
         self.assertIn('bond6',  state.bonds)
         self.assertIn('eth0',   self.configmanager.physical_interfaces)
@@ -199,7 +176,6 @@ class TestConfigManager(unittest.TestCase):
         self.assertIn('vlan2',   self.configmanager.virtual_interfaces)
         self.assertIn('br3',     self.configmanager.virtual_interfaces)
         self.assertIn('br4',     self.configmanager.virtual_interfaces)
-        self.assertIn('vxlan1005', self.configmanager.virtual_interfaces)
         self.assertIn('bond5',   self.configmanager.virtual_interfaces)
         self.assertIn('bond6',   self.configmanager.virtual_interfaces)
         self.assertIn('he-ipv6', self.configmanager.virtual_interfaces)

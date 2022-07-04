@@ -227,10 +227,6 @@ class State:
         return dict((nd.id, nd) for nd in _NetdefIterator(self, "tunnels"))
 
     @property
-    def vxlans(self):
-        return dict((nd.id, nd) for nd in _NetdefIterator(self, "vxlans"))
-
-    @property
     def vrfs(self):
         return dict((nd.id, nd) for nd in _NetdefIterator(self, "vrfs"))
 
