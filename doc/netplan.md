@@ -1397,26 +1397,41 @@ Example:
 
 ## Properties for device type ``vrfs:``
 
-``table`` (scalar)
+``table`` (scalar) – since **0.105**
 
 :    The numeric routing table identifier. This setting is compulsory.
 
-``interfaces`` (sequence of scalars)
+``interfaces`` (sequence of scalars) – since **0.105**
 
 :    All devices matching this ID list will be added to the vrf. This may
      be an empty list, in which case the vrf will be brought online with
      no member interfaces.
 
-     Example:
+``routes`` (sequence of mappings) – since **0.105**
 
-          vrfs:
-            vrf20:
-              table: 20
-              interfaces: [ br0 ]
-          [...]
-          bridges:
-            br0:
-              interfaces: []
+:    Configure static routing for the device; see the ``Routing`` section.
+     The ``table`` value is implicitly set to the VRF's ``table``.
+
+``routing-policy`` (sequence of mappings) – since **0.105**
+
+:   Configure policy routing for the device; see the ``Routing`` section.
+    The ``table`` value is implicitly set to the VRF's ``table``.
+
+Example:
+
+    vrfs:
+      vrf20:
+        table: 20
+        interfaces: [ br0 ]
+        routes:
+        - to: default
+          via: 10.10.10.3
+        routing-policy:
+        - from: 10.10.10.42
+      [...]
+      bridges:
+        br0:
+          interfaces: []
 
 ## Properties for device type ``nm-devices:``
 
@@ -1499,11 +1514,11 @@ This is a complex example which shows most available features:
           table: 10
           interfaces:
             - id1
+          routes:
+            - to: default
+              via: 192.168.24.254
+              metric: 100
       ethernets:
-        lo:
-          addresses:
-            - 172.16.20.20/32
-          link-local: []
         # opaque ID for physical interfaces, only referred to by other stanzas
         id0:
           match:
@@ -1536,6 +1551,8 @@ This is a complex example which shows most available features:
               from: 192.168.14.3/24
               table: 70
               priority: 50
+          # only networkd can render on-link routes and routing policies
+          renderer: networkd
         id1:
           match:
             macaddress: 00:11:22:33:44:56
@@ -1543,17 +1560,6 @@ This is a complex example which shows most available features:
           dhcp4: true
           addresses:
             - 192.168.24.2/24
-          nameservers:
-            search: [foo.local, bar.local]
-            addresses: [8.8.8.8]
-          routes:
-            - to: 0.0.0.0/0
-              via: 192.168.24.254
-              table: 10
-              on-link: true
-              metric: 100
-          # only networkd can render on-link routes and routing policies
-          renderer: networkd
         lom:
           match:
             driver: ixgbe

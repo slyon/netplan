@@ -6,6 +6,11 @@ network:
       interfaces:
         - br1
         - br1005
+      routes:
+        - to: default
+          via: 10.10.10.4
+      routing-policy:
+        - from: 10.10.10.42
   bridges:
     br1:
       interfaces: []
