@@ -21,6 +21,58 @@
 from .base import TestBase
 
 
+class NetworkManager(TestBase):
+
+    def test_vrf_set_table(self):
+        self.generate('''network:
+  version: 2
+  renderer: NetworkManager
+  ethernets:
+    eth0: { dhcp4: true }
+  vrfs:
+    vrf1005:
+      table: 1005
+      interfaces: [eth0]
+      routes:
+      - to: default
+        via: 1.2.3.4
+      routing-policy:
+      - from: 2.3.4.5''')
+
+        self.assert_nm({'eth0': '''[connection]
+id=netplan-eth0
+type=ethernet
+interface-name=eth0
+slave-type=vrf
+master=vrf1005
+
+[ethernet]
+wake-on-lan=0
+
+[ipv4]
+method=auto
+
+[ipv6]
+method=ignore
+''',
+                        'vrf1005': '''[connection]
+id=netplan-vrf1005
+type=vrf
+interface-name=vrf1005
+
+[vrf]
+table=1005
+
+[ipv4]
+route1=0.0.0.0/0,1.2.3.4
+route1_options=table=1005
+method=link-local
+
+[ipv6]
+method=ignore
+'''})
+
+
 class TestNetworkd(TestBase):
 
     def test_vrf_set_table(self):
