@@ -711,7 +711,7 @@ _serialize_yaml(
         g_hash_table_iter_init(&iter, np_state->netdefs);
         while (g_hash_table_iter_next (&iter, &key, &value)) {
             NetplanNetDefinition *nd = (NetplanNetDefinition *) value;
-            if (g_strcmp0(nd->bond, def->id) == 0 || g_strcmp0(nd->bridge, def->id) == 0 || g_strcmp0(nd->vrf, def->id) == 0)
+            if (g_strcmp0(nd->bond, def->id) == 0 || g_strcmp0(nd->bridge, def->id) == 0 || nd->vrf_link == def)
                 g_array_append_val(tmp_arr, nd);
         }
         if (tmp_arr->len > 0) {

@@ -2035,10 +2035,10 @@ handle_vrf_interfaces(NetplanParser* npp, yaml_node_t* node, const void* data, G
         if (!component) {
             add_missing_node(npp, entry);
         } else {
-            if (component->vrf && g_strcmp0(component->vrf, npp->current.netdef->id) != 0)
+            if (component->vrf_link && component->vrf_link != npp->current.netdef)
                 return yaml_error(npp, node, error, "%s: interface '%s' is already assigned to vrf %s",
-                                  npp->current.netdef->id, scalar(entry), component->vrf);
-            set_str_if_null(component->vrf, npp->current.netdef->id);
+                                  npp->current.netdef->id, scalar(entry), component->vrf_link->id);
+            component->vrf_link = npp->current.netdef;
         }
     }
 

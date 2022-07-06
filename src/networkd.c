@@ -671,8 +671,8 @@ netplan_netdef_write_network_file(
     }
 
     /* VRF linkage */
-    if (def->vrf)
-        g_string_append_printf(network, "VRF=%s\n", def->vrf);
+    if (def->vrf_link)
+        g_string_append_printf(network, "VRF=%s\n", def->vrf_link->id);
 
     if (is_optional || def->optional_addresses) {
         if (is_optional) {

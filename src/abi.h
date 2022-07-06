@@ -363,6 +363,6 @@ struct netplan_net_definition {
 
     /* vrf */
     /* netplan-feature: vrf */
-    char* vrf;
+    NetplanNetDefinition* vrf_link;
     guint vrf_table;
 };
