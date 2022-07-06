@@ -2570,10 +2570,11 @@ static const mapping_entry_handler vlan_def_handlers[] = {
 };
 
 static const mapping_entry_handler vrf_def_handlers[] = {
-    COMMON_LINK_HANDLERS,
     COMMON_BACKEND_HANDLERS,
     {"interfaces", YAML_SEQUENCE_NODE, {.generic=handle_vrf_interfaces}, NULL},
     {"table", YAML_SCALAR_NODE, {.generic=handle_netdef_guint}, netdef_offset(vrf_table)},
+    {"routes", YAML_SEQUENCE_NODE, {.generic=handle_routes}},
+    {"routing-policy", YAML_SEQUENCE_NODE, {.generic=handle_ip_rules}},
     {NULL}
 };
 
@@ -3008,6 +3009,11 @@ netplan_state_import_parser_results(NetplanState* np_state, NetplanParser* npp, 
         gpointer key, value;
         char *regdom = NULL;
         g_debug("We have some netdefs, pass them through a final round of validation");
+
+        /* Check/adopt VRF routes before route consistency and validation */
+        if (!adopt_and_validate_vrf_routes(npp, npp->parsed_defs, error))
+            return FALSE;
+
         if (!validate_default_route_consistency(npp, npp->parsed_defs, &recoverable)) {
             g_warning("Problem encountered while validating default route consistency."
                       "Please set up multiple routing tables and use `routing-policy` instead.\n"

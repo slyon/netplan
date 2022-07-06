@@ -420,6 +420,51 @@ sriov_rules_error:
     return valid;
 }
 
+gboolean
+adopt_and_validate_vrf_routes(const NetplanParser *npp, GHashTable *netdefs, GError **error)
+{
+    gpointer key, value;
+    GHashTableIter iter;
+
+    g_hash_table_iter_init (&iter, netdefs);
+    while (g_hash_table_iter_next (&iter, &key, &value))
+    {
+        NetplanNetDefinition *nd = value;
+        if (nd->type != NETPLAN_DEF_TYPE_VRF || !nd->routes)
+            continue;
+
+        /* Routes */
+        for (size_t i = 0; i < nd->routes->len; i++) {
+            NetplanIPRoute* r = g_array_index(nd->routes, NetplanIPRoute*, i);
+            if (r->table == nd->vrf_table)
+                continue;
+            else if (r->table != NETPLAN_ROUTE_TABLE_UNSPEC && r->table != nd->vrf_table) {
+                g_set_error(error, G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT,
+                            "%s: VRF routes table mismatch (%d != %d)", nd->id, nd->vrf_table, r->table);
+                return FALSE;
+            } else {
+                r->table = nd->vrf_table;
+                g_debug("%s: Adopted VRF routes table to %d", nd->id, nd->vrf_table);
+            }
+        }
+        /* IP Rules */
+        for (size_t i = 0; i < nd->ip_rules->len; i++) {
+            NetplanIPRule* r = g_array_index(nd->ip_rules, NetplanIPRule*, i);
+            if (r->table == nd->vrf_table)
+                continue;
+            else if (r->table != NETPLAN_ROUTE_TABLE_UNSPEC && r->table != nd->vrf_table) {
+                g_set_error(error, G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT,
+                            "%s: VRF routing-policy table mismatch (%d != %d)", nd->id, nd->vrf_table, r->table);
+                return FALSE;
+            } else {
+                r->table = nd->vrf_table;
+                g_debug("%s: Adopted VRF routing-policy table to %d", nd->id, nd->vrf_table);
+            }
+        }
+    }
+    return TRUE;
+}
+
 struct _defroute_entry {
     int family;
     int table;

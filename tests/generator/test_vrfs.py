@@ -26,16 +26,45 @@ class TestNetworkd(TestBase):
     def test_vrf_set_table(self):
         self.generate('''network:
   version: 2
+  ethernets:
+    eth0: { dhcp4: true }
   vrfs:
     vrf1005:
-      table: 1005''')
+      table: 1005
+      interfaces: [eth0]
+      routes:
+      - to: default
+        via: 1.2.3.4
+      routing-policy:
+      - from: 2.3.4.5''')
 
-        self.assert_networkd({'vrf1005.network': '''[Match]
+        self.assert_networkd({'eth0.network': '''[Match]
+Name=eth0
+
+[Network]
+VRF=vrf1005
+DHCP=ipv4
+LinkLocalAddressing=ipv6
+
+[DHCP]
+RouteMetric=100
+UseMTU=true
+''',
+                               'vrf1005.network': '''[Match]
 Name=vrf1005
 
 [Network]
 LinkLocalAddressing=ipv6
 ConfigureWithoutCarrier=yes
+
+[Route]
+Destination=0.0.0.0/0
+Gateway=1.2.3.4
+Table=1005
+
+[RoutingPolicyRule]
+From=2.3.4.5
+Table=1005
 ''',
                               'vrf1005.netdev': '''[NetDev]
 Name=vrf1005
@@ -58,6 +87,18 @@ class TestNetplanYAMLv2(TestBase):
   vrfs:
     vrf1005:
       table: 1005''')
+
+    def test_vrf_routes(self):
+        self.generate('''network:
+  version: 2
+  vrfs:
+    vrf1005:
+      table: 1005
+      routes:
+      - to: default
+        via: 1.2.3.4
+      routing-policy:
+      - from: 1.2.3.4''')
 
 
 class TestConfigErrors(TestBase):
@@ -83,3 +124,36 @@ class TestConfigErrors(TestBase):
   ethernets:
     eno1: {}''', expect_fail=True)
         self.assertIn("vrf1: interface 'eno1' is already assigned to vrf vrf0", err)
+
+    def test_vrf_routes_table_mismatch(self):
+        err = self.generate('''network:
+  version: 2
+  vrfs:
+    vrf0:
+      table: 42
+      routes:
+      - table: 42 # pass
+        to: default
+        via: 1.2.3.4
+      - table: 43 # mismatch
+        to: 99.88.77.66
+        via: 2.3.4.5
+''', expect_fail=True)
+        self.assertIn("vrf0: VRF routes table mismatch (42 != 43)", err)
+
+    def test_vrf_policy_table_mismatch(self):
+        err = self.generate('''network:
+  version: 2
+  vrfs:
+    vrf0:
+      table: 45
+      routes:
+      - to: default
+        via: 3.4.5.6
+      routing-policy:
+      - table: 45 # pass
+        from: 1.2.3.4
+      - table: 46 # mismatch
+        from: 2.3.4.5
+''', expect_fail=True)
+        self.assertIn("vrf0: VRF routing-policy table mismatch (45 != 46)", err)
