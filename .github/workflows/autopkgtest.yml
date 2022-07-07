@@ -24,8 +24,10 @@ jobs:
         run: |
           sudo sed -i '/deb-src/s/^# //' /etc/apt/sources.list
           sudo apt update
-          sudo apt install autopkgtest ubuntu-dev-tools devscripts openvswitch-switch
+          # sudo apt install autopkgtest ubuntu-dev-tools devscripts openvswitch-switch
+          sudo apt install autopkgtest ubuntu-dev-tools devscripts
           sudo snap install lxd
+          sudo snap refresh lxd
           sudo lxd init --auto --storage-backend=dir
       # work around LP: #1878225 as fallback
       - name: Preparing autopkgtest-build-lxd
