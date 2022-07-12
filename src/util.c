@@ -34,6 +34,26 @@
 #include "names.h"
 #include "yaml-helpers.h"
 
+/* Glib 2.56 compat, see:
+ * https://gitlab.gnome.org/GNOME/glib/-/issues/1943
+ */
+#ifndef g_clear_list
+void
+g_clear_list (GList **list_ptr, GDestroyNotify destroy)
+{
+  GList *list;
+  list = *list_ptr;
+  if (list)
+    {
+      *list_ptr = NULL;
+      if (destroy)
+        g_list_free_full (list, destroy);
+      else
+        g_list_free (list);
+    }
+}
+#endif
+
 NETPLAN_ABI GHashTable*
 wifi_frequency_24;
 

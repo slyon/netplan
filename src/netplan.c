@@ -1104,7 +1104,8 @@ netplan_state_update_yaml_hierarchy(const NetplanState* np_state, const char* de
             NetplanNetDefinition* netdef = iter->data;
             const char* filename = netdef->filepath ? netdef->filepath : default_path;
             GList* list = NULL;
-            g_hash_table_steal_extended(perfile_netdefs, filename, NULL, (gpointer*)&list);
+            if (g_hash_table_lookup_extended(perfile_netdefs, filename, NULL, (gpointer*)&list))
+                g_hash_table_steal(perfile_netdefs, filename);
             g_hash_table_insert(perfile_netdefs, (gpointer)filename, g_list_append(list, netdef));
             iter = iter->next;
         }

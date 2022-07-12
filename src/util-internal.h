@@ -25,6 +25,14 @@
 #include <glib.h>
 #include "netplan.h"
 
+/* Glib 2.56 compat, see:
+ * https://gitlab.gnome.org/GNOME/glib/-/issues/1943
+ */
+#ifndef g_clear_list
+void
+g_clear_list (GList **list_ptr, GDestroyNotify destroy);
+#endif
+
 #define SET_OPT_OUT_PTR(ptr,val) { if (ptr) *ptr = val; }
 
 extern GHashTable*
