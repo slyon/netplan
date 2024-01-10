@@ -41,8 +41,8 @@ For details of the configuration file format, see **`netplan`**(5).
 :    Print debugging output during the process.
 
 `--root-dir` *`ROOT_DIR`*
-:   Instead of looking in `/{lib,etc,run}/netplan`, look in
-    `/ROOT_DIR/{lib,etc,run}/netplan`.
+:   Instead of looking in `/{lib,run,etc}/netplan`, look in
+    `/ROOT_DIR/{lib,run,etc}/netplan`.
 
 `--mapping` *`MAPPING`*
 :   Instead of generating output files, parse the configuration files
@@ -54,15 +54,15 @@ For details of the configuration file format, see **`netplan`**(5).
 There are 3 locations that **`netplan generate`** considers:
 
  * `/lib/netplan/*.yaml`
- * `/etc/netplan/*.yaml`
  * `/run/netplan/*.yaml`
+ * `/etc/netplan/*.yaml`
 
 If there are multiple files with exactly the same name, then only one
-will be read. A file in `/run/netplan` will shadow - completely replace
-- a file with the same name in `/etc/netplan`. A file in `/etc/netplan`
+will be read. A file in `/etc/netplan` will shadow - completely replace
+- a file with the same name in `/run/netplan`. A file in `/run/netplan`
 will itself shadow a file in `/lib/netplan`.
 
-Or, in other words, `/run/netplan` is top priority, then `/etc/netplan`,
+Or, in other words, `/etc/netplan` is top priority, then `/run/netplan`,
 with `/lib/netplan` having the lowest priority.
 
 If there are files with different names, then they are considered in

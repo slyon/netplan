@@ -3,7 +3,7 @@
 ## YAML configuration
 Netplan configuration files use the
 [YAML (v1.1)](http://yaml.org/spec/1.1/current.html) format. All files in
-`/{lib,etc,run}/netplan/*.yaml` are considered and are supposed to use
+`/{lib,run,etc}/netplan/*.yaml` are considered and are supposed to use
 restrictive file permissions (`600`/`rw-------`), i.e. owner (root) read-write
 only.
 

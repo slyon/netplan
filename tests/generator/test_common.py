@@ -19,7 +19,7 @@
 import os
 import textwrap
 
-from .base import TestBase, ND_DHCP4, ND_DHCP6, ND_DHCPYES, ND_EMPTY, NM_MANAGED, NM_UNMANAGED
+from .base import TestBase, ND_DHCP4, ND_DHCP6, ND_DHCPYES, ND_EMPTY, ND_WITHIP, NM_MANAGED, NM_UNMANAGED
 
 
 class TestNetworkd(TestBase):
@@ -1692,7 +1692,7 @@ UseMTU=true
     def test_def_in_run(self):
         rundir = os.path.join(self.workdir.name, 'run', 'netplan')
         os.makedirs(rundir)
-        # override b.yaml definition for enred
+        # gets overridden by b.yaml definition for enred in /etc
         with open(os.path.join(rundir, 'b.yaml'), 'w') as f:
             f.write('''network:
   version: 2
@@ -1704,17 +1704,23 @@ UseMTU=true
   version: 2
   ethernets: {enblue: {dhcp4: true}}''')
 
+        # write /etc/netplan/a.yaml and /etc/netplan/b.yaml
         self.generate('''network:
   version: 2
-  ethernets:
-    engreen: {dhcp4: true}''', confs={'b': '''network:
+  ethernets: {engreen: {dhcp4: true}}''', confs={'b': '''network:
   version: 2
-  ethernets: {enred: {wakeonlan: true}}'''})
+  ethernets:
+    enred:
+      wakeonlan: true  # WOL will create a .link file
+      addresses: [10.0.0.42/24]
+      ignore-carrier: true'''})
 
-        # b.yaml in /run/ should completely shadow b.yaml in /etc, thus no enred.link
+        # b.yaml in /etc should completely shadow b.yaml in /run,
+        # producing enred.link with WOL settings
         self.assert_networkd({'engreen.network': ND_DHCP4 % 'engreen',
-                              'enred.network': ND_DHCP4 % 'enred',
-                              'enblue.network': ND_DHCP4 % 'enblue'})
+                              'enred.network': ND_WITHIP % ('enred', '10.0.0.42/24'),
+                              'enblue.network': ND_DHCP4 % 'enblue',
+                              'enred.link': '[Match]\nOriginalName=enred\n\n[Link]\nWakeOnLan=magic\n'})
 
     def test_def_in_lib(self):
         libdir = os.path.join(self.workdir.name, 'lib', 'netplan')
