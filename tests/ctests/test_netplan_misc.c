@@ -234,6 +234,44 @@ test_netplan_netdef_write_yaml(__unused void** state)
     rmdir(rootdir);
 }
 
+const char*
+_create_netplan_hierarcy(char* template)
+{
+    const char* rootdir = mkdtemp(template);
+
+    // create Netplan configuration hierarchy/directories
+    g_autofree gchar* lib = g_strdup_printf("%s/lib", rootdir);
+    g_autofree gchar* usr = g_strdup_printf("%s/usr", rootdir);
+    g_autofree gchar* etc = g_strdup_printf("%s/etc", rootdir);
+    g_autofree gchar* etc_netplan = g_strdup_printf("%s/netplan", etc);
+    g_autofree gchar* usr_lib = g_strdup_printf("%s/lib", usr);
+    g_autofree gchar* usr_lib_netplan = g_strdup_printf("%s/netplan", usr_lib);
+    g_mkdir_with_parents(etc_netplan, 0770);
+    g_mkdir_with_parents(usr_lib_netplan, 0770);
+    symlink(usr_lib, lib); // usrmerge: lib/ -> usr/lib/
+
+    return rootdir;
+}
+
+void
+_clear_netplan_hierarchy(const char* rootdir)
+{
+    g_autofree gchar* lib = g_strdup_printf("%s/lib", rootdir);
+    g_autofree gchar* usr = g_strdup_printf("%s/usr", rootdir);
+    g_autofree gchar* etc = g_strdup_printf("%s/etc", rootdir);
+    g_autofree gchar* etc_netplan = g_strdup_printf("%s/netplan", etc);
+    g_autofree gchar* usr_lib = g_strdup_printf("%s/lib", usr);
+    g_autofree gchar* usr_lib_netplan = g_strdup_printf("%s/netplan", usr_lib);
+
+    rmdir(etc_netplan);
+    rmdir(etc);
+    rmdir(usr_lib_netplan);
+    rmdir(usr_lib);
+    rmdir(usr);
+    unlink(lib);
+    rmdir(rootdir);
+}
+
 void
 test_netplan_netdef_write_yaml_90NM(__unused void** state)
 {
