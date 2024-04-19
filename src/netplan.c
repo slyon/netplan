@@ -1013,6 +1013,12 @@ contains_netdef_type(gconstpointer value, gconstpointer user_data)
 STATIC gboolean
 netplan_netdef_list_write_yaml(const NetplanState* np_state, GList* netdefs, int out_fd, const char* out_fname, gboolean is_fallback, GError** error)
 {
+    // only ever touch files in /etc/netplan/
+    if (out_fname && !g_strrstr(out_fname, "/etc/netplan/")) {
+        g_debug("Skipping file %s for being outside of /etc/netplan/", out_fname);
+        return TRUE;
+    }
+
     GHashTable *ovs_ports = NULL;
 
     int dup_fd = dup(out_fd);
