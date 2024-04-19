@@ -203,6 +203,7 @@ struct netplan_state {
      * char*) and is initialized with g_hash_table_new_full to avoid leaks. */
     GHashTable* sources;
     GHashTable* global_renderer;
+    struct private_netdef_data* _private;
 };
 
 struct netplan_parser {
@@ -263,6 +264,7 @@ struct netplan_parser {
     GHashTable* null_fields;
     GHashTable* null_overrides;
     GHashTable* global_renderer;
+    struct private_netdef_data* _private;
 };
 
 struct netplan_state_iterator {

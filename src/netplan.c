@@ -41,6 +41,13 @@ gchar *tmp = NULL;
      (_def)->_private->dirty_fields && \
      g_hash_table_contains((_def)->_private->dirty_fields, _data_ref))
 
+/*
+if (value_ptr && DIRTY(_def, value_ptr)) { \
+        YAML_SCALAR_PLAIN(event_ptr, emitter_ptr, key); \
+        YAML_SCALAR_QUOTED(event_ptr, emitter_ptr, (gchar*)g_hash_table_lookup(_def->_private->dirty_fields, &value_ptr)); \
+    } \
+    else
+*/
 #define YAML_STRING(_def, event_ptr, emitter_ptr, key, value_ptr) {\
     if (value_ptr) { \
         YAML_SCALAR_PLAIN(event_ptr, emitter_ptr, key); \
@@ -1039,24 +1046,55 @@ netplan_netdef_list_write_yaml(const NetplanState* np_state, GList* netdefs, int
     YAML_SCALAR_PLAIN(event, emitter, "network");
     YAML_MAPPING_OPEN(event, emitter);
     /* We support version 2 only, currently */
+    //FIXME: only write "version" stanza if dirty
     YAML_NONNULL_STRING_PLAIN(event, emitter, "version", "2");
 
     /* fallback to default global handling, if renderer was not set for this file */
     NetplanBackend renderer = netplan_state_get_backend(np_state);
-    /* Try to find a file specific (global) renderer.
-     * If this is the fallback file (70-netplan-set.yaml or <origin-hint>.yaml),
-     * a renderer parsed from a YAML patch takes precedence. */
-    if (out_fname && np_state->global_renderer) {
-        gpointer value;
-        renderer = GPOINTER_TO_INT(g_hash_table_lookup(np_state->global_renderer, out_fname));
-        /* A renderer parsed from an (anonymous) YAML patch takes precendence
-         * (e.g. "netplan set ..."). Such data does not have any filename
-         * associated to it in the global_renderer map (i.e. empty string). */
-        if (is_fallback && g_hash_table_lookup_extended(np_state->global_renderer, "", NULL, &value))
-            renderer = GPOINTER_TO_INT(value);
+    //printf("STATE BACKEND OUT %p\n", &np_state->backend);
+    //printf("out_fname %s %d\n", out_fname, is_fallback);
+    if (np_state->_private && np_state->_private->dirty_fields) {
+        char* filepath = g_hash_table_lookup(np_state->_private->dirty_fields, &np_state->backend);
+        //printf("filepath <%s>\n", filepath);
+        // <filepath> is set iff this field/setting was read somewhere in the hierarcy (i.e. is "dirty")
+        if (filepath) {
+            if (   (is_fallback && !out_fname) // dumping everything
+                || (is_fallback && g_str_has_prefix(filepath, __UNNAMED)) // new global settings (from an __UNNAMED file) are written to fallback path
+                || g_str_has_prefix(filepath, out_fname) // originates from this very file
+               ) {
+                YAML_NONNULL_STRING_PLAIN(event, emitter, "renderer", netplan_backend_name(renderer));
+            } else if (g_strrstr(filepath, out_fname) && !g_str_has_prefix(filepath, out_fname)) { // keep the original value in lower priority file
+                /*
+                //XXX: parse just the single file and get the global renderer (original value)
+                NetplanParser *npp = netplan_parser_new();
+                NetplanState *np_state = netplan_state_new();
+                printf("res %d\n", netplan_parser_load_yaml(npp, out_fname, NULL));
+                printf("res %d\n", netplan_state_import_parser_results(np_state, npp, NULL));
+                NetplanBackend original_renderer = netplan_state_get_backend(np_state);
+                printf("ORIGINAL %d\n", original_renderer);
+                printf("netdefs %d\n", netplan_state_get_netdefs_size(np_state));
+                FILE *fd = fopen(out_fname, "r");
+                char file_buffer[1024] = {0};
+                fread(file_buffer, 1, 1024, fd);
+                printf("list_write: out_fname: %s\n%s\n", out_fname, file_buffer);
+                */
+                NetplanBackend original_renderer = 0;
+                gchar **split = g_strsplit(filepath, ":", 0);
+                for (unsigned i = 0; split[i]; ++i) {
+                    //printf("SPLIT %s\n", split[i]);
+                    char* value_ptr = g_strrstr(split[i], "/");
+                    if (value_ptr)
+                        original_renderer = atoi(value_ptr+1);
+
+                }
+                g_strfreev(split);
+                //printf("original: %s\n", netplan_backend_name(original_renderer));
+                YAML_NONNULL_STRING_PLAIN(event, emitter, "renderer", netplan_backend_name(original_renderer));
+            } else {
+                //printf("renderer ERROR: filepath: %s, out_fname: %s, is_fallback: %d, renderer: %s\n", filepath, out_fname, is_fallback, netplan_backend_name(renderer));
+            }
+        }
     }
-    if (renderer == NETPLAN_BACKEND_NM || renderer == NETPLAN_BACKEND_NETWORKD)
-        YAML_NONNULL_STRING_PLAIN(event, emitter, "renderer", netplan_backend_name(renderer));
 
     /* Do not write any netdefs, if we're just setting/updating some globals,
      * e.g.: netplan set "network.renderer=NetworkManager" */
@@ -1201,7 +1239,32 @@ netplan_state_update_yaml_hierarchy(const NetplanState* np_state, const char* de
     default_path = g_build_path(G_DIR_SEPARATOR_S, rootdir ?: G_DIR_SEPARATOR_S, "etc", "netplan", default_filename, NULL);
     int out_fd = -1;
 
-    /* Dump global conf to the default path */
+    if (np_state->_private && np_state->_private->dirty_fields) {
+        char *renderer_filepath = g_hash_table_lookup(np_state->_private->dirty_fields, &np_state->backend);
+        //printf("RENDERER_FILEPATH %s\n", renderer_filepath); //FIXME filepath/value handling
+        if (renderer_filepath) {
+            gchar **split = g_strsplit(renderer_filepath, ":", 0);
+            for (unsigned i = 0; split[i]; ++i) {
+                //printf("SPLIT %s\n", split[i]);
+                // ignore __UNNAMED in update_yaml_hierarchy() and only edit files in /etc/netplan/
+                if (g_strrstr(split[i], "/etc/netplan/")) {
+                    g_hash_table_insert(perfile_netdefs, g_strdup(split[i]), NULL);
+                    break;
+                }
+            }
+            g_strfreev(split);
+        }
+    }
+
+    /* Dump global conf (renderer) to the default path, if dirty from __UNNAMED source */
+    if (np_state->_private && np_state->_private->dirty_fields) {
+        const char* filepath = g_hash_table_lookup(np_state->_private->dirty_fields, &np_state->backend);
+        if (filepath && g_str_has_prefix(filepath, __UNNAMED)) {
+            g_hash_table_insert(perfile_netdefs, default_path, NULL);
+        }
+    }
+
+    /*
     if (!np_state->netdefs || g_hash_table_size(np_state->netdefs) == 0) {
         if (   has_openvswitch(&np_state->ovs_settings, NETPLAN_BACKEND_NONE, NULL)
             || (np_state->backend != NETPLAN_BACKEND_NONE && np_state->global_renderer &&
@@ -1210,6 +1273,8 @@ netplan_state_update_yaml_hierarchy(const NetplanState* np_state, const char* de
             g_hash_table_insert(perfile_netdefs, default_path, NULL);
         }
     } else {
+    */
+    if (np_state->netdefs && g_hash_table_size(np_state->netdefs) > 0) {
         GList* iter = np_state->netdefs_ordered;
         while (iter) {
             NetplanNetDefinition* netdef = iter->data;
@@ -1245,6 +1310,7 @@ netplan_state_update_yaml_hierarchy(const NetplanState* np_state, const char* de
         out_fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0600);
         if (out_fd < 0)
             goto file_error;
+        //printf("PERDEF %s %d\n", filename, is_fallback);
         if (!netplan_netdef_list_write_yaml(np_state, netdefs, out_fd, filename, is_fallback, error))
             goto cleanup; // LCOV_EXCL_LINE
         close(out_fd);

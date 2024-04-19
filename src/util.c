@@ -899,14 +899,98 @@ has_openvswitch(const NetplanOVSSettings* ovs, NetplanBackend backend, GHashTabl
 void
 mark_data_as_dirty(NetplanParser* npp, const void* data_ptr)
 {
-    // We don't support dirty tracking for globals yet.
-    if (!npp->current.netdef)
-        return;
-    if (!npp->current.netdef->_private)
-        npp->current.netdef->_private = g_new0(struct private_netdef_data, 1);
-    if (!npp->current.netdef->_private->dirty_fields)
-        npp->current.netdef->_private->dirty_fields = g_hash_table_new(g_direct_hash, g_direct_equal);
-    g_hash_table_insert(npp->current.netdef->_private->dirty_fields, (void*)data_ptr, (void*)data_ptr);
+    //fprintf(stderr, "MARK_DIRTY %p\n", data_ptr);
+    if (!npp->current.netdef) {
+        // Handle global data on a per parser scope ("renderer" for now)
+        if (!npp->_private)
+            npp->_private = g_new0(struct private_netdef_data, 1);
+        if (!npp->_private->dirty_fields)
+            npp->_private->dirty_fields = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, g_free);
+        char *old_filepath = (char*)g_hash_table_lookup(npp->_private->dirty_fields, (void*)data_ptr);
+        const char *filepath = npp->current.filepath ?: __UNNAMED;
+        //fprintf(stderr, "OLD FILEPATH %s\n", old_filepath);
+        if (!old_filepath) {
+            //fprintf(stderr, "XX INSERT  %s\n", filepath);
+            g_hash_table_insert(npp->_private->dirty_fields, (void*)data_ptr, g_strdup(filepath));
+        } else if (g_strrstr(old_filepath, filepath) != old_filepath) { //FIXME: why the duplication?
+            char *fpath = g_strdup_printf("%s:%s", filepath, old_filepath);
+            //fprintf(stderr, "XX PREPEND %s\n", fpath);
+            g_hash_table_replace(npp->_private->dirty_fields, (void*)data_ptr, fpath);
+        }
+    } else {
+        // Handle per netdef data
+        if (!npp->current.netdef->_private)
+            npp->current.netdef->_private = g_new0(struct private_netdef_data, 1);
+        if (!npp->current.netdef->_private->dirty_fields)
+            npp->current.netdef->_private->dirty_fields = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, g_free);
+
+        char *old_filepath = (char*)g_hash_table_lookup(npp->current.netdef->_private->dirty_fields, (void*)data_ptr);
+        const char *filepath = npp->current.filepath ?: __UNNAMED;;
+        //fprintf(stderr, "OLD FILEPATH %s\n", old_filepath);
+        if (!old_filepath) {
+            //fprintf(stderr, "YY INSERT  %s\n", filepath);
+            g_hash_table_insert(npp->current.netdef->_private->dirty_fields, (void*)data_ptr, g_strdup(filepath));
+            //filepath = g_strdup_printf("%s:%s", old_filepath, __UNNAMED);
+            //printf("ADD3 %s\n", filepath);
+            //g_hash_table_replace(npp->current.netdef->_private->dirty_fields, (void*)data_ptr, filepath);
+        } else if (g_strrstr(old_filepath, filepath) != old_filepath) { //FIXME: why the duplication?
+            char *fpath = g_strdup_printf("%s:%s", filepath, old_filepath);
+            //fprintf(stderr, "YY PREPEND %s\n", fpath);
+            g_hash_table_replace(npp->current.netdef->_private->dirty_fields, (void*)data_ptr, fpath);
+            //filepath = g_strdup(npp->current.filepath ?: __UNNAMED);
+            //printf("ADD4 %s\n", filepath);
+        }
+        //g_hash_table_insert(npp->current.netdef->_private->dirty_fields, (void*)data_ptr, g_strdup(npp->current.filepath ?: __UNNAMED)); // XXX: What are the side-effects here?
+    }
+}
+
+//FIXME: no additional _global function
+void
+mark_data_as_dirty_global(NetplanParser* npp, const void* data_ptr, int value)
+{
+    //fprintf(stderr, "MARK_DIRTY %p %d\n", data_ptr, value);
+    if (!npp->current.netdef) {
+        // Handle global data on a per parser scope ("renderer" for now)
+        if (!npp->_private)
+            npp->_private = g_new0(struct private_netdef_data, 1);
+        if (!npp->_private->dirty_fields)
+            npp->_private->dirty_fields = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, g_free);
+        char *old_filepath = (char*)g_hash_table_lookup(npp->_private->dirty_fields, (void*)data_ptr);
+        const char *filepath = npp->current.filepath ?: __UNNAMED;
+        //fprintf(stderr, "OLD FILEPATH %s\n", old_filepath);
+        if (!old_filepath) {
+            //fprintf(stderr, "XX INSERT  %s\n", filepath);
+            g_hash_table_insert(npp->_private->dirty_fields, (void*)data_ptr, g_strdup_printf("%s/%d", filepath, value));
+        } else if (g_strrstr(old_filepath, filepath) != old_filepath) { //FIXME: why the duplication?
+            char *fpath = g_strdup_printf("%s/%d:%s", filepath, value, old_filepath);
+            //fprintf(stderr, "XX PREPEND %s\n", fpath);
+            g_hash_table_replace(npp->_private->dirty_fields, (void*)data_ptr, fpath);
+        }
+    } else {
+        // Handle per netdef data
+        if (!npp->current.netdef->_private)
+            npp->current.netdef->_private = g_new0(struct private_netdef_data, 1);
+        if (!npp->current.netdef->_private->dirty_fields)
+            npp->current.netdef->_private->dirty_fields = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, g_free);
+
+        char *old_filepath = (char*)g_hash_table_lookup(npp->current.netdef->_private->dirty_fields, (void*)data_ptr);
+        const char *filepath = npp->current.filepath ?: __UNNAMED;;
+        //fprintf(stderr, "OLD FILEPATH %s\n", old_filepath);
+        if (!old_filepath) {
+            //fprintf(stderr, "YY INSERT  %s\n", filepath);
+            g_hash_table_insert(npp->current.netdef->_private->dirty_fields, (void*)data_ptr, g_strdup(filepath));
+            //filepath = g_strdup_printf("%s:%s", old_filepath, __UNNAMED);
+            //printf("ADD3 %s\n", filepath);
+            //g_hash_table_replace(npp->current.netdef->_private->dirty_fields, (void*)data_ptr, filepath);
+        } else if (g_strrstr(old_filepath, filepath) != old_filepath) { //FIXME: why the duplication?
+            char *fpath = g_strdup_printf("%s:%s", filepath, old_filepath);
+            //fprintf(stderr, "YY PREPEND %s\n", fpath);
+            g_hash_table_replace(npp->current.netdef->_private->dirty_fields, (void*)data_ptr, fpath);
+            //filepath = g_strdup(npp->current.filepath ?: __UNNAMED);
+            //printf("ADD4 %s\n", filepath);
+        }
+        //g_hash_table_insert(npp->current.netdef->_private->dirty_fields, (void*)data_ptr, g_strdup(npp->current.filepath ?: __UNNAMED)); // XXX: What are the side-effects here?
+    }
 }
 
 gboolean

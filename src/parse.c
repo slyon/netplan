@@ -279,6 +279,7 @@ get_handler(const mapping_entry_handler* handlers, const char* key)
 STATIC gboolean
 process_mapping(NetplanParser* npp, yaml_node_t* node, const char* key_prefix, const mapping_entry_handler* handlers, GList** out_values, GError** error)
 {
+    //fprintf(stderr, "PROCESS MAPPING %s\n", npp->current.filepath);
     yaml_node_pair_t* entry;
 
     assert_type(npp, node, YAML_MAPPING_NODE);
@@ -294,6 +295,7 @@ process_mapping(NetplanParser* npp, yaml_node_t* node, const char* key_prefix, c
         key = yaml_document_get_node(&npp->doc, entry->key);
         value = yaml_document_get_node(&npp->doc, entry->value);
         assert_type(npp, key, YAML_SCALAR_NODE);
+        //fprintf(stderr, "NODE %s\n", scalar(key));
         if (npp->null_fields && key_prefix) {
             full_key = g_strdup_printf("%s\t%s", key_prefix, scalar(key));
             if (g_hash_table_contains(npp->null_fields, full_key))
@@ -1212,19 +1214,22 @@ static const mapping_entry_handler wifi_access_point_handlers[] = {
 STATIC gboolean
 parse_renderer(NetplanParser* npp, yaml_node_t* node, NetplanBackend* backend, GError** error)
 {
+    //TODO: mark globals dirty
     if (strcmp(scalar(node), "networkd") == 0)
         *backend = NETPLAN_BACKEND_NETWORKD;
     else if (strcmp(scalar(node), "NetworkManager") == 0)
         *backend = NETPLAN_BACKEND_NM;
     else
         return yaml_error(npp, node, error, "unknown renderer '%s'", scalar(node));
-    mark_data_as_dirty(npp, backend);
+    //mark_data_as_dirty(npp, backend);
+    mark_data_as_dirty_global(npp, backend, *backend);
     return TRUE;
 }
 
 STATIC gboolean
 handle_netdef_renderer(NetplanParser* npp, yaml_node_t* node, __unused const void* _, GError** error)
 {
+    //TODO: mark globals dirty
     if (npp->current.netdef->type == NETPLAN_DEF_TYPE_VLAN) {
         if (strcmp(scalar(node), "sriov") == 0) {
             npp->current.netdef->sriov_vlan_filter = TRUE;
@@ -3066,6 +3071,8 @@ STATIC gboolean
 handle_network_renderer(NetplanParser* npp, yaml_node_t* node, __unused const void* _, GError** error)
 {
     gboolean res = parse_renderer(npp, node, &npp->global_backend, error);
+    //printf("### RENDER global_backend %p %s\n", &npp->global_backend, npp->current.filepath); fflush(stdout);
+    mark_data_as_dirty(npp, &npp->global_backend);
     if (!npp->global_renderer)
         npp->global_renderer = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
     char* key = npp->current.filepath ? g_strdup(npp->current.filepath) : g_strdup("");
@@ -3327,6 +3334,7 @@ handle_network_type(NetplanParser* npp, yaml_node_t* node, const char* key_prefi
             set_str_if_null(npp->current.netdef->match.original_name, npp->current.netdef->id);
     }
     npp->current.backend = NETPLAN_BACKEND_NONE;
+    npp->current.netdef = NULL;
     return TRUE;
 }
 
@@ -3489,6 +3497,8 @@ cleanup:
 STATIC gboolean
 _netplan_parser_load_single_file(NetplanParser* npp, const char *opt_filepath, yaml_document_t *doc, GError** error)
 {
+    //fprintf(stderr, "\n======================================\n");
+    //fprintf(stderr, "PARSER: load_single_file %s\n", opt_filepath);
     int ret = FALSE;
 
     if (opt_filepath) {
@@ -3615,7 +3625,20 @@ netplan_state_import_parser_results(NetplanState* np_state, NetplanParser* npp, 
     }
     np_state->netdefs_ordered = g_list_concat(np_state->netdefs_ordered, npp->ordered);
     np_state->ovs_settings = npp->global_ovs_settings;
-    np_state->backend = npp->global_backend;
+    np_state->backend = npp->global_backend; //XXX: copy value vs transfer pointer for _private->dirty_fields
+    //printf("GLOBAL BACKEND: state %p, parser %p\n", &np_state->backend, &npp->global_backend);
+    // Handle global data on a per state scope ("renderer" for now)
+    if (!np_state->_private)
+        np_state->_private = g_new0(struct private_netdef_data, 1);
+    if (!np_state->_private->dirty_fields)
+        np_state->_private->dirty_fields = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, g_free);
+    if (npp->_private && npp->_private->dirty_fields) {
+        //g_hash_table_insert(np_state->_private->dirty_fields, (void*)data_ptr, g_strdup(npp->current.filepath));
+        char* filepath = g_hash_table_lookup(npp->_private->dirty_fields, &npp->global_backend);
+        g_hash_table_replace(np_state->_private->dirty_fields, &np_state->backend, filepath);
+        //printf("STATE BACKEND: %p, %s\n", &np_state->backend, filepath);
+    }
+
 
     if (npp->sources) {
         if (!np_state->sources)
@@ -3856,3 +3879,4 @@ netplan_parser_load_nullable_overrides(
     yaml_document_delete(&doc);
     return TRUE;
 }
+    //TODO: mark globals dirty

@@ -24,6 +24,7 @@
 #include <glib.h>
 #include "netplan.h"
 
+#define __UNNAMED "__UNNAMED"
 #define SET_OPT_OUT_PTR(ptr,val) { if (ptr) *ptr = val; }
 
 #define __unused __attribute__((unused))
@@ -65,6 +66,9 @@ systemd_escape(char* string);
 
 void
 mark_data_as_dirty(NetplanParser* npp, const void* data_ptr);
+
+void
+mark_data_as_dirty_global(NetplanParser* npp, const void* data_ptr, int value);
 
 const char*
 tunnel_mode_to_string(NetplanTunnelMode mode);
