@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <setjmp.h>
 
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <netinet/in.h>
 
@@ -270,6 +271,77 @@ _clear_netplan_hierarchy(const char* rootdir)
     rmdir(usr);
     unlink(lib);
     rmdir(rootdir);
+}
+
+void
+test_netplan_yaml_origin_tracking(__unused void** state)
+{
+    //TODO: /usr/lib/netplan/00-network-manager-all.yaml
+    // /etc/netplan/50-someting
+    // /etc/netplan/100-override
+    // + YAML patch
+    // check globals and locals
+
+    //GError *error = NULL;
+    char template[] = "/tmp/netplan.XXXXXX";
+    const char* rootdir = _create_netplan_hierarcy(template);
+
+    // create YAML config in hierarchy
+    const char* yaml1 = "network:\n  renderer: NetworkManager\n";
+    const char* yaml2 = "network:\n  renderer: networkd\n"
+        "  ethernets:\n"
+        "    eth0:\n"
+        "      dhcp4: true\n";
+    mode_t old_umask = umask(0077);
+    g_autofree gchar* file1 = g_strdup_printf("%s/usr/lib/netplan/00-network-manager-all.yaml", rootdir);
+    g_autofree gchar* file2 = g_strdup_printf("%s/etc/netplan/50-config.yaml", rootdir);
+    FILE* f1 = fopen(file1, "w");
+    FILE* f2 = fopen(file2, "w");
+    fwrite(yaml1, strlen(yaml1), 1, f1);
+    fwrite(yaml2, strlen(yaml2), 1, f2);
+    fclose(f1);
+    fclose(f2);
+    umask(old_umask);
+
+    // prepare 'netplan set network.renderer=NetworkManager' patch
+    int patch_fd = memfd_create("UNNAMED_PATCH.yaml", 0);
+    FILE *patch = fdopen(patch_fd, "w+");
+    netplan_util_create_yaml_patch("network\trenderer", "NetworkManager", patch_fd, NULL);
+
+    NetplanParser* npp = netplan_parser_new();
+    fseek(patch, 0, SEEK_SET);
+    netplan_parser_load_nullable_fields(npp, patch_fd, NULL);
+    netplan_parser_load_yaml_hierarchy(npp, rootdir, NULL);
+    fseek(patch, 0, SEEK_SET);
+    netplan_parser_load_yaml_from_fd(npp, patch_fd, NULL);
+
+    // No origin-hint given
+    const char* default_filename = "70-netplan-set.yaml";
+    NetplanState* np_state = netplan_state_new();
+    netplan_state_import_parser_results(np_state, npp, NULL);
+    assert_true(netplan_state_update_yaml_hierarchy(np_state, default_filename, rootdir, NULL));
+    netplan_state_clear(&np_state);
+
+    /* Check fallback file does not exist */
+    g_autofree gchar* default_file = g_strdup_printf("%s/etc/netplan/%s", rootdir, default_filename);
+    struct stat st = {0};
+    assert_false(stat(default_file, &st) == 0);
+
+    /* Check file contents */
+    // FIXME: handle "version" stanza properly
+    const char* expected_output = "network:\n  version: 2\n  renderer: NetworkManager\n"
+        "  ethernets:\n"
+        "    eth0:\n"
+        "      dhcp4: true\n";
+    FILE *fd = fopen(file2, "r");
+    char file_buffer[1024] = {0};
+    assert_true(fread(file_buffer, 1, 1024, fd) > 0);
+    assert_string_equal(expected_output, file_buffer);
+
+    /* Cleanup */
+    remove(file1);
+    remove(file2);
+    _clear_netplan_hierarchy(rootdir);
 }
 
 void
@@ -571,6 +643,7 @@ main()
            cmocka_unit_test(test_netplan_netdef_get_output_filename_invalid_backend),
            cmocka_unit_test(test_netplan_netdef_write_yaml),
            cmocka_unit_test(test_netplan_netdef_write_yaml_90NM),
+           cmocka_unit_test(test_netplan_yaml_origin_tracking),
            cmocka_unit_test(test_util_is_route_present),
            cmocka_unit_test(test_util_is_route_rule_present),
            cmocka_unit_test(test_util_is_string_in_array),
