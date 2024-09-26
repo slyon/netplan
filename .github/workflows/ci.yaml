@@ -1,0 +1,45 @@
+name: CI Matrix
+
+on:
+  - push
+  - pull_request
+
+env:
+  DEBIAN_FRONTEND: noninteractive
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        container:
+          - debian:stable-slim
+          - debian:testing-slim
+          - debian:unstable-slim
+          - ubuntu:latest
+          - ubuntu:rolling
+          - ubuntu:devel
+          - fedora:latest
+          - fedora:rawhide
+          - redhat:ubi9-minimal
+    container:
+      image: ${{ matrix.container }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: |
+          # Always include phased updates (LP: #1979244)
+          echo "APT::Get::Always-Include-Phased-Updates \"true\";" | tee /etc/apt/apt.conf.d/90phased-updates
+          sed -i '/deb-src/s/^# //' /etc/apt/sources.list
+          apt update
+          apt -y install abigail-tools meson python3-coverage python3-pytest python3-pytest-cov devscripts equivs
+          mk-build-deps -i -t 'apt-get -o Debug::pkgProblemResolver=yes --yes --no-install-recommends' netplan.io
+      - name: Build
+        run: |
+          meson setup _build -Dunit_testing=false --prefix=/usr
+          meson compile -C _build
+      # Abigail ABI checker
+      - name: Check ABI compatibility
+        run: |
+          abidiff abi-compat/jammy_0.106.xml _build/src/libnetplan.so.0.0 --headers-dir2 include/ --header-file2 src/abi.h --suppressions abi-compat/suppressions.abignore --no-added-syms
